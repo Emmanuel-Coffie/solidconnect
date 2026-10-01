@@ -1,0 +1,269 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model User {
+  id String @id @default(uuid())
+  email String @unique
+  name String
+  passwordHash String
+  accountType String
+  role String @default("USER")
+  sessionVersion Int @default(0)
+  emailVerified Boolean @default(false)
+  bio String?
+  company String?
+  phone String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  profile Profile?
+  businessProfile BusinessProfile?
+  accounts Account[]
+  listings Listing[]
+  requests ServiceRequest[]
+  messages Message[]
+  payments Payment[]
+  favourites Favourite[]
+  notifications Notification[]
+  tokens AuthToken[]
+  reviews Review[]
+}
+model Account {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  provider String
+  providerAccountId String
+  @@unique([provider,providerAccountId])
+}
+model Profile {
+  userId String @id
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  bio String @default("")
+  phone String @default("")
+  updatedAt DateTime @updatedAt
+}
+model BusinessProfile {
+  userId String @id
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  name String
+  verified Boolean @default(false)
+  updatedAt DateTime @updatedAt
+}
+model Listing {
+  id String @id @default(uuid())
+  ownerId String?
+  owner User? @relation(fields:[ownerId],references:[id],onDelete:SetNull)
+  category String
+  status String @default("pending")
+  payload Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  job Job?
+  artisan ArtisanProfile?
+  property Property?
+  product Product?
+  service ServiceListing?
+  requests ServiceRequest[]
+  favourites Favourite[]
+  reviews Review[]
+  @@index([category,status])
+  @@index([ownerId])
+}
+model Job {
+  listingId String @id
+  listing Listing @relation(fields:[listingId],references:[id],onDelete:Cascade)
+  employmentType String?
+  experience String?
+  applications JobApplication[]
+}
+model ArtisanProfile {
+  listingId String @id
+  listing Listing @relation(fields:[listingId],references:[id],onDelete:Cascade)
+  specialty String?
+  portfolio PortfolioItem[]
+}
+model PortfolioItem {
+  id String @id @default(uuid())
+  artisanId String
+  artisan ArtisanProfile @relation(fields:[artisanId],references:[listingId],onDelete:Cascade)
+  imageUrl String
+  title String
+  createdAt DateTime @default(now())
+}
+model Property {
+  listingId String @id
+  listing Listing @relation(fields:[listingId],references:[id],onDelete:Cascade)
+  bedrooms Int?
+  bathrooms Int?
+  purpose String?
+}
+model SupplierProfile {
+  id String @id @default(uuid())
+  name String
+  verified Boolean @default(false)
+  products Product[]
+}
+model Product {
+  listingId String @id
+  listing Listing @relation(fields:[listingId],references:[id],onDelete:Cascade)
+  supplierId String?
+  supplier SupplierProfile? @relation(fields:[supplierId],references:[id])
+  minimumOrder String?
+}
+model ServiceListing {
+  listingId String @id
+  listing Listing @relation(fields:[listingId],references:[id],onDelete:Cascade)
+  serviceType String
+}
+model ServiceRequest {
+  id String @id @default(uuid())
+  userId String?
+  user User? @relation(fields:[userId],references:[id],onDelete:SetNull)
+  listingId String?
+  listing Listing? @relation(fields:[listingId],references:[id],onDelete:SetNull)
+  kind String
+  status String @default("Submitted")
+  payload Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  conversation Conversation?
+  jobApplication JobApplication?
+  logisticsRequest LogisticsRequest?
+  tradeRequest TradeRequest?
+  marketingRequest MarketingRequest?
+  contactSubmission ContactSubmission?
+  quotes Quote[]
+  @@index([userId,status])
+  @@index([listingId])
+}
+model JobApplication {
+  requestId String @id
+  request ServiceRequest @relation(fields:[requestId],references:[id],onDelete:Cascade)
+  jobId String
+  job Job @relation(fields:[jobId],references:[listingId])
+}
+model LogisticsRequest {
+  requestId String @id
+  request ServiceRequest @relation(fields:[requestId],references:[id],onDelete:Cascade)
+  origin String?
+  destination String?
+  shipments Shipment[]
+}
+model Shipment {
+  id String @id @default(uuid())
+  trackingNumber String @unique
+  logisticsRequestId String?
+  logisticsRequest LogisticsRequest? @relation(fields:[logisticsRequestId],references:[requestId])
+  origin String
+  destination String
+  status String
+  eta DateTime?
+  events ShipmentEvent[]
+  createdAt DateTime @default(now())
+}
+model ShipmentEvent {
+  id String @id @default(uuid())
+  shipmentId String
+  shipment Shipment @relation(fields:[shipmentId],references:[id],onDelete:Cascade)
+  status String
+  location String?
+  occurredAt DateTime @default(now())
+  @@index([shipmentId,occurredAt])
+}
+model TradeRequest {
+  requestId String @id
+  request ServiceRequest @relation(fields:[requestId],references:[id],onDelete:Cascade)
+  direction String?
+  originCountry String?
+  destinationCountry String?
+}
+model MarketingRequest {
+  requestId String @id
+  request ServiceRequest @relation(fields:[requestId],references:[id],onDelete:Cascade)
+  objectives String?
+  budget String?
+}
+model Quote {
+  id String @id @default(uuid())
+  requestId String
+  request ServiceRequest @relation(fields:[requestId],references:[id],onDelete:Cascade)
+  amount Int
+  currency String @default("GHS")
+  description String
+  status String @default("draft")
+  createdAt DateTime @default(now())
+}
+model Conversation {
+  id String @id
+  request ServiceRequest @relation(fields:[id],references:[id],onDelete:Cascade)
+  messages Message[]
+  createdAt DateTime @default(now())
+}
+model Message {
+  id String @id @default(uuid())
+  conversationId String
+  conversation Conversation @relation(fields:[conversationId],references:[id],onDelete:Cascade)
+  userId String
+  user User @relation(fields:[userId],references:[id])
+  text String
+  createdAt DateTime @default(now())
+  @@index([conversationId,createdAt])
+}
+model Favourite {
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  listingId String
+  listing Listing @relation(fields:[listingId],references:[id],onDelete:Cascade)
+  @@id([userId,listingId])
+}
+model Payment {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId],references:[id])
+  reference String @unique
+  amount Int
+  currency String @default("GHS")
+  status String @default("pending")
+  provider String
+  description String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId,createdAt])
+}
+model Notification {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  text String
+  read Boolean @default(false)
+  createdAt DateTime @default(now())
+  @@index([userId,read])
+}
+model Review {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId],references:[id])
+  listingId String
+  listing Listing @relation(fields:[listingId],references:[id])
+  rating Int
+  text String
+  createdAt DateTime @default(now())
+  @@unique([userId,listingId])
+}
+model ContactSubmission {
+  requestId String @id
+  request ServiceRequest @relation(fields:[requestId],references:[id],onDelete:Cascade)
+  email String
+}
+model AuthToken {
+  hash String @id
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  kind String
+  expires DateTime
+  @@index([expires])
+}

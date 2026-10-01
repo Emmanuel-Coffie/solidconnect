@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: solidconnect
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a local database password}
+      POSTGRES_DB: solidconnect
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - solidconnect-db:/var/lib/postgresql/data
+volumes:
+  solidconnect-db:

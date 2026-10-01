@@ -1,0 +1,3 @@
+const fs = require('node:fs/promises');
+const ids = ['photo-1653566031535-bcf33e1c2893','photo-1504148455328-c376907d081c','photo-1578575437130-527eed3abbec','photo-1600607687920-4e2a09cf159d','photo-1586528116311-ad8dd3c8310d','photo-1573167101669-476636b96cea','photo-1494412519320-aa613dfb7738','photo-1497366754035-f200968a6e72'];
+Promise.all(ids.map(async id=>{const r=await fetch(`https://images.unsplash.com/${id}?auto=format&fit=crop&w=1600&q=85`,{signal:AbortSignal.timeout(60000)});if(!r.ok)throw Error(id+' '+r.status);await fs.writeFile(`public/images/${id}.jpg`,Buffer.from(await r.arrayBuffer()));console.log(id,'saved')})).catch(e=>{console.error(e);process.exitCode=1});
