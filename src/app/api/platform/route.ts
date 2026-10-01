@@ -282,6 +282,32 @@ export async function POST(req: Request) {
       ).catch(() => {});
       return NextResponse.json({ entry });
     }
+    if (action === "verify-email") {
+      const token = z.string().min(32).max(128).parse(body.token);
+      await mutate((s) => {
+        const tokenHash = createHash("sha256").update(token).digest("hex");
+        const record = s.tokens.find(
+          (t) =>
+            t.hash === tokenHash &&
+            t.kind === "verify" &&
+            t.expires > Date.now(),
+        );
+        if (!record)
+          throw new ApiError(
+            400,
+            "This verification link is invalid or has expired. Request a new one from your profile.",
+          );
+        const account = s.users.find((u) => u.id === record.userId);
+        if (!account)
+          throw new ApiError(
+            400,
+            "This verification link is invalid or has expired. Request a new one from your profile.",
+          );
+        account.emailVerified = true;
+        s.tokens = s.tokens.filter((t) => t !== record);
+      });
+      return NextResponse.json({ message: "Your email is verified." });
+    }
     const user = await requireUser();
     if (action === "send-verification") {
       if (user.emailVerified)
@@ -313,26 +339,6 @@ export async function POST(req: Request) {
       return NextResponse.json({
         message: "Verification link sent. Check your inbox.",
       });
-    }
-    if (action === "verify-email") {
-      const token = z.string().min(32).max(128).parse(body.token);
-      await mutate((s) => {
-        const record = s.tokens.find(
-          (t) =>
-            t.hash === createHash("sha256").update(token).digest("hex") &&
-            t.kind === "verify" &&
-            t.userId === user.id &&
-            t.expires > Date.now(),
-        );
-        if (!record)
-          throw new ApiError(
-            400,
-            "This verification link is invalid or has expired. Request a new one from your profile.",
-          );
-        s.users.find((u) => u.id === user.id)!.emailVerified = true;
-        s.tokens = s.tokens.filter((t) => t !== record);
-      });
-      return NextResponse.json({ message: "Your email is verified." });
     }
     if (action === "profile") {
       const input = z
