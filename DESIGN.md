@@ -43,3 +43,7 @@ Runtime ownership: globals.css continues to own the core palette and product tok
 The actual container is 1360px including 40px desktop gutters. Large service galleries have three columns, then two below 1100px and one below 700px. The homepage strip has seven, then four, then two. These brand breakpoints supplement the existing core breakpoints. The original desktop seven-service strip remains recognizable while photographs gain greater prominence.
 
 A 650ms CSS arrival on app/template.tsx makes page navigation feel intentional. Reduced-motion disables arrival and image zoom transitions. Decorative paths never capture pointer events. No endless movement or autoplay is introduced. Generated editorial photographs illustrate possibilities and must not be described as real staff or premises.
+
+
+## November marketplace and portal
+The owner requested service advertising, guest purchase enquiries, admin-led conversations and an independent account portal. The public marketplace makes products and services equally visible and explains the admin handoff. A navy concierge strip with an orange advertiser link is the marketplace signature. The portal has a compact navy masthead, orange rule, white workspace and blue status accents; marketing Header/Footer are absent. Runtime ownership remains globals.css and providers.tsx; portal.css composes these existing tokens. docs/PRODUCTION.md records domain deployment and communication limits.

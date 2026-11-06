@@ -26,14 +26,13 @@ import { ListingCard } from "./cards";
 import { CategorySelect } from "./forms";
 import { listingSchema } from "@/lib/validation";
 import { type Listing, money, services, photo } from "@/lib/catalog";
-import type { Entry, Payment, Message, User } from "@/lib/store";
+import type { Entry, Message, User } from "@/lib/store";
 export type DashboardData = {
   user: Omit<User, "passwordHash">;
   listings: Listing[];
   requests: Entry[];
   saved: Listing[];
   messages: Message[];
-  payments: Payment[];
   notifications: {
     id: string;
     text: string;
@@ -42,17 +41,16 @@ export type DashboardData = {
   }[];
 };
 const links = [
-  ["Overview", "/dashboard", "dashboard"],
-  ["My profile", "/dashboard/profile", "person"],
-  ["My listings", "/dashboard/listings", "inventory"],
-  ["My orders", "/dashboard/orders", "inventory"],
-  ["My requests", "/dashboard/requests", "chat"],
-  ["Applications", "/dashboard/applications", "people"],
-  ["Saved items", "/dashboard/saved", "saved"],
-  ["Messages", "/dashboard/messages", "chat"],
-  ["Payments", "/dashboard/payments", "receipt"],
-  ["Notifications", "/dashboard/notifications", "check"],
-  ["Settings", "/dashboard/settings", "person"],
+  ["Overview", "/portal", "dashboard"],
+  ["My profile", "/portal/profile", "person"],
+  ["My listings", "/portal/listings", "inventory"],
+  ["My orders", "/portal/orders", "inventory"],
+  ["My requests", "/portal/requests", "chat"],
+  ["Applications", "/portal/applications", "people"],
+  ["Saved items", "/portal/saved", "saved"],
+  ["Messages", "/portal/messages", "chat"],
+  ["Notifications", "/portal/notifications", "check"],
+  ["Settings", "/portal/settings", "person"],
 ];
 function NavIcon({ name }: { name: string }) {
   if (name === "dashboard") return <DashboardOutlined />;
@@ -68,6 +66,7 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
   const pathname = usePathname();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
+  const [signingOut, setSigningOut] = useState(false);
   const load = useCallback(async () => {
     try {
       setData(await api<DashboardData>("dashboard"));
@@ -77,10 +76,10 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
     }
   }, []);
   useEffect(() => {
-    if (!loading && !user)
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    if (!loading && !user && !signingOut)
+      router.replace(`/portal/login?next=${encodeURIComponent(pathname)}`);
     if (user) load();
-  }, [user, loading, router, pathname, load]);
+  }, [user, loading, router, pathname, load, signingOut]);
   if (!user)
     return (
       <div className="loading-page">
@@ -116,16 +115,23 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
           </Link>
         ))}
         {user.role === "ADMIN" && (
-          <Link href="/admin">
+          <Link href="/portal/admin">
             <Icon name="check" />
             Administration
           </Link>
         )}
         <Button
+          disabled={signingOut}
           onClick={async () => {
-            await api("logout", {});
-            await refresh();
-            router.push("/");
+            setSigningOut(true);
+            try {
+              await api("logout", {});
+              await refresh();
+              router.replace("/portal/login");
+            } catch (error) {
+              setError((error as Error).message);
+              setSigningOut(false);
+            }
           }}
         >
           Sign out
@@ -138,13 +144,13 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
             <h1>{title}</h1>
             <p>
               {section === "overview"
-                ? "Here’s what’s happening in your Solid Connect world."
+                ? "Manage your products and services. Our admin team handles customer enquiries."
                 : "Keep your opportunities moving forward."}
             </p>
           </div>
           {section !== "new" && (
             <LinkButton
-              href="/dashboard/listings/new"
+              href="/portal/listings/new"
               variant="contained"
               color="secondary"
               startIcon={<Add />}
@@ -192,8 +198,6 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
           <Messages data={data} reload={load} />
         ) : section === "listings" ? (
           <MyListings data={data} reload={load} />
-        ) : section === "payments" ? (
-          <PaymentHistory payments={data.payments} />
         ) : section === "notifications" ? (
           <Notifications data={data} reload={load} />
         ) : (
@@ -245,12 +249,8 @@ function Overview({ data }: { data: DashboardData }) {
             ),
           ],
           [
-            "Total payments",
-            money(
-              data.payments
-                .filter((p) => p.status === "success")
-                .reduce((sum, p) => sum + p.amount / 100, 0),
-            ),
+            "Awaiting review",
+            String(data.listings.filter((l) => l.status === "pending").length),
           ],
         ].map(([label, value]) => (
           <div className="stat-card" key={label}>
@@ -263,7 +263,7 @@ function Overview({ data }: { data: DashboardData }) {
         <div className="panel">
           <div className="row-between">
             <h3>Recent activity</h3>
-            <Link href="/dashboard/requests" className="text-link">
+            <Link href="/portal/requests" className="text-link">
               View all
             </Link>
           </div>
@@ -273,7 +273,7 @@ function Overview({ data }: { data: DashboardData }) {
               .reverse()
               .map((r) => (
                 <Link
-                  href="/dashboard/messages"
+                  href="/portal/messages"
                   className="activity-row"
                   key={r.id}
                 >
@@ -301,7 +301,7 @@ function Overview({ data }: { data: DashboardData }) {
           <h3>Make your next move</h3>
           <div className="quick-actions">
             {[
-              ["Post a new listing", "/dashboard/listings/new", "inventory"],
+              ["Post a new listing", "/portal/listings/new", "inventory"],
               ["Find your next hire", "/services/recruitment", "people"],
               ["Track a shipment", "/track", "shipping"],
               ["Request a quote", "/services/logistics", "globe"],
@@ -431,7 +431,7 @@ function MyListings({
       <Empty
         title="Your expertise belongs here."
         text="Create your first listing to connect with the people who need you."
-        href="/dashboard/listings/new"
+        href="/portal/listings/new"
         cta="Create a listing"
       />
     );
@@ -451,7 +451,7 @@ function MyListings({
           </div>
           <p>{l.description}</p>
           <div className="button-row">
-            <LinkButton href={`/dashboard/listings/new?edit=${l.id}`}>
+            <LinkButton href={`/portal/listings/new?edit=${l.id}`}>
               Edit listing
             </LinkButton>
             {l.status === "published" && (
@@ -543,10 +543,10 @@ function Requests({
             </p>
           )}
           <div className="button-row">
-            <LinkButton href={`/dashboard/messages?conversation=${r.id}`}>
+            <LinkButton href={`/portal/messages?conversation=${r.id}`}>
               Open conversation
             </LinkButton>
-            {data.listings.some((l) => l.id === r.listingId) && (
+            {data.user.role === "ADMIN" && (
               <TextField
                 select
                 label="Application status"
@@ -648,7 +648,8 @@ function Messages({
           </Button>
         </div>
         <p className="small-caption">
-          Messages are saved in this platform. Refresh to check for replies.
+          Your conversation is with Solid Connect admin. Refresh to check for
+          replies.
         </p>
         <div className="message-history">
           <div className="message-bubble">
@@ -702,46 +703,6 @@ function Messages({
     </div>
   );
 }
-export function PaymentHistory({ payments }: { payments: Payment[] }) {
-  return payments.length ? (
-    <div className="record-list">
-      {payments
-        .slice()
-        .reverse()
-        .map((p) => (
-          <div className="record row-between" key={p.id}>
-            <div>
-              <h3>{p.description}</h3>
-              <p>{p.reference}</p>
-              <small>
-                {p.provider === "mock" ? "Test payment · " : ""}
-                {new Date(p.createdAt).toLocaleDateString("en-GB")}
-              </small>
-            </div>
-            <div>
-              <strong>{money(p.amount / 100)}</strong>
-              <p>
-                <span className={`status ${p.status}`}>{p.status}</span>
-              </p>
-              <Link
-                className="text-link"
-                href={`/payment/success?reference=${p.reference}`}
-              >
-                View receipt
-              </Link>
-            </div>
-          </div>
-        ))}
-    </div>
-  ) : (
-    <Empty
-      title="No payments yet."
-      text="Your transaction history and receipts will appear here."
-      href="/pricing"
-      cta="Explore plans"
-    />
-  );
-}
 function Notifications({
   data,
   reload,
@@ -792,10 +753,10 @@ function Notifications({
 }
 const draftDefault = {
   title: "",
-  category: "Jobs",
+  category: "Services",
   location: "",
   price: "0",
-  unit: "/ month",
+  unit: "Price on request",
   description: "",
   image: services[0].image as string,
   details: {} as Record<string, string>,
@@ -875,7 +836,7 @@ function ListingWizard({ onCreated }: { onCreated: () => Promise<void> }) {
             await api("listing", { ...form, id: editId || undefined });
             localStorage.removeItem(draftKey);
             await onCreated();
-            router.push("/dashboard/listings");
+            router.push("/portal/listings");
           } catch (e) {
             setError((e as Error).message);
           } finally {

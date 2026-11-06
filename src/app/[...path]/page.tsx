@@ -1,12 +1,11 @@
 import { Suspense } from "react";
-import { notFound } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import type { Metadata } from "next";
 import {
   Services,
   ServicePage,
   About,
   Faq,
-  Pricing,
   Resources,
   Legal,
   PageHero,
@@ -14,7 +13,7 @@ import {
 import { Marketplace, ListingDetail } from "@/components/marketplace";
 import { AuthForm, Contact, VerifyEmail } from "@/components/forms";
 import { Dashboard } from "@/components/dashboard";
-import { Track, Checkout, PaymentResult } from "@/components/transactions";
+import { Track } from "@/components/transactions";
 import { Admin } from "@/components/admin";
 import { services, articles } from "@/lib/catalog";
 type Props = { params: Promise<{ path: string[] }> };
@@ -27,6 +26,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       : path.map((p) => p.replaceAll("-", " ")).join(" · ");
   return {
     title: title.charAt(0).toUpperCase() + title.slice(1),
+    ...(path[0] === "portal"
+      ? { robots: { index: false, follow: false } }
+      : {}),
     description:
       service?.description ??
       "Explore Solid Connect — people, businesses and opportunities, connected.",
@@ -34,7 +36,46 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 export default async function Page({ params }: Props) {
   const { path } = await params;
-  const [root, sub, third] = path;
+  const [original, ...rest] = path;
+  if (original === "dashboard")
+    redirect("/portal" + (rest.length ? "/" + rest.join("/") : ""));
+  // Legacy auth routes retain query strings through next.config redirects.
+  const [root, sub, third] =
+    original === "portal"
+      ? rest.length
+        ? ["dashboard", ...rest]
+        : ["dashboard"]
+      : path;
+  if (
+    original === "portal" &&
+    [
+      "login",
+      "register",
+      "forgot-password",
+      "reset-password",
+      "verify-email",
+      "admin",
+    ].includes(rest[0])
+  )
+    return (
+      <Suspense fallback={<div className="loading-page">Loading portal…</div>}>
+        {rest[0] === "admin" ? (
+          <Admin />
+        ) : rest[0] === "verify-email" ? (
+          <VerifyEmail />
+        ) : (
+          <AuthForm
+            mode={
+              rest[0] === "forgot-password"
+                ? "forgot"
+                : rest[0] === "reset-password"
+                  ? "reset"
+                  : (rest[0] as "login" | "register")
+            }
+          />
+        )}
+      </Suspense>
+    );
   let page: React.ReactNode;
   if (root === "services" && !sub) page = <Services />;
   else if (root === "services" && services.some((s) => s.slug === sub))
@@ -47,6 +88,7 @@ export default async function Page({ params }: Props) {
       properties: "Properties",
       products: "Products",
       logistics: "Logistics",
+      services: "Services",
     };
     page =
       !sub || categories[sub] ? (
@@ -82,7 +124,6 @@ export default async function Page({ params }: Props) {
         "applications",
         "saved",
         "messages",
-        "payments",
         "settings",
         "notifications",
       ].includes(sub))
@@ -95,10 +136,8 @@ export default async function Page({ params }: Props) {
       />
     );
   else if (root === "track") page = <Track />;
-  else if (root === "checkout") page = <Checkout />;
-  else if (root === "payment" && ["success", "failed", "pending"].includes(sub))
-    page = <PaymentResult />;
-  else if (root === "pricing") page = <Pricing />;
+  else if (["checkout", "payment", "pricing"].includes(root))
+    redirect("/contact");
   else if (root === "faq") page = <Faq />;
   else if (
     root === "resources" &&

@@ -57,7 +57,7 @@ export function ListingCard({
   const router = useRouter();
   async function toggle() {
     if (!user) {
-      router.push(`/login?next=/marketplace/${listing.id}`);
+      router.push(`/portal/login?next=/marketplace/${listing.id}`);
       return;
     }
     setBusy(true);

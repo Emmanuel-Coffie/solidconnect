@@ -13,19 +13,19 @@ import {
   Skeleton,
 } from "@mui/material";
 import { api, useAuth } from "./providers";
-import { type Listing, money } from "@/lib/catalog";
-import type { User, Entry, Payment } from "@/lib/store";
+import { type Listing } from "@/lib/catalog";
+import type { User, Entry, Message } from "@/lib/store";
 type Data = {
   users: Omit<User, "passwordHash">[];
   listings: Listing[];
   requests: Entry[];
-  payments: Payment[];
+  messages: Message[];
 };
 export function Admin() {
   const { user, loading } = useAuth();
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState("listings");
+  const [tab, setTab] = useState("requests");
   async function load() {
     try {
       setData(await api<Data>("admin"));
@@ -43,7 +43,9 @@ export function Admin() {
         <Alert severity="warning">
           This area requires an administrator account.
         </Alert>
-        <LinkButton href={user ? "/dashboard" : "/login?next=/admin"}>
+        <LinkButton
+          href={user ? "/portal" : "/portal/login?next=/portal/admin"}
+        >
           Go to {user ? "dashboard" : "sign in"}
         </LinkButton>
       </div>
@@ -54,7 +56,7 @@ export function Admin() {
         <div className="section-heading">
           <div>
             <div className="eyebrow">Solid Connect administration</div>
-            <h1>Keep the network moving.</h1>
+            <h1>Every enquiry. One admin team.</h1>
           </div>
           <Button onClick={load}>Refresh</Button>
         </div>
@@ -71,7 +73,10 @@ export function Admin() {
                   data.listings.filter((l) => l.status === "pending").length,
                 ],
                 ["Service requests", data.requests.length],
-                ["Transactions", data.payments.length],
+                [
+                  "Awaiting review",
+                  data.requests.filter((r) => r.status === "Submitted").length,
+                ],
               ].map(([label, value]) => (
                 <div className="stat-card" key={label}>
                   <span>{label}</span>
@@ -85,44 +90,37 @@ export function Admin() {
               variant="scrollable"
               sx={{ mb: 3 }}
             >
-              {["listings", "requests", "users", "payments"].map((x) => (
+              {["requests", "listings", "users"].map((x) => (
                 <Tab key={x} value={x} label={x} />
               ))}
             </Tabs>
-            <div className="admin-grid">
+            <div className="admin-grid admin-inbox">
               {tab === "listings"
                 ? data.listings.map((l) => (
                     <Moderation key={l.id} listing={l} reload={load} />
                   ))
                 : tab === "requests"
                   ? data.requests.map((r) => (
-                      <RequestRow key={r.id} entry={r} reload={load} />
+                      <RequestRow
+                        key={r.id}
+                        entry={r}
+                        messages={data.messages.filter(
+                          (m) => m.conversationId === r.id,
+                        )}
+                        reload={load}
+                      />
                     ))
-                  : tab === "users"
-                    ? data.users.map((u) => (
-                        <div className="record row-between" key={u.id}>
-                          <div>
-                            <h3>{u.name}</h3>
-                            <p>{u.email}</p>
-                          </div>
-                          <span className="status">
-                            {u.role} · {u.accountType}
-                          </span>
+                  : data.users.map((u) => (
+                      <div className="record row-between" key={u.id}>
+                        <div>
+                          <h3>{u.name}</h3>
+                          <p>{u.email}</p>
                         </div>
-                      ))
-                    : data.payments.map((p) => (
-                        <div className="record row-between" key={p.id}>
-                          <div>
-                            <h3>{p.description}</h3>
-                            <p>{p.reference}</p>
-                            <small>{p.provider}</small>
-                          </div>
-                          <strong>{money(p.amount / 100)}</strong>
-                          <span className={`status ${p.status}`}>
-                            {p.status}
-                          </span>
-                        </div>
-                      ))}
+                        <span className="status">
+                          {u.role} · {u.accountType}
+                        </span>
+                      </div>
+                    ))}
             </div>
           </>
         )}
@@ -227,12 +225,16 @@ function Moderation({
 }
 function RequestRow({
   entry,
+  messages,
   reload,
 }: {
   entry: Entry;
+  messages: Message[];
   reload: () => Promise<void>;
 }) {
   const [error, setError] = useState("");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
   return (
     <div className="record">
       <div className="row-between">
@@ -274,6 +276,90 @@ function RequestRow({
         </TextField>
       </div>
       <p>{entry.message}</p>
+      <dl className="request-meta">
+        {Object.entries({
+          Reference: entry.id,
+          Name: entry.name,
+          Email: entry.email,
+          Phone: entry.phone,
+          Listing: entry.listingId,
+          ...entry.details,
+        })
+          .filter(([, value]) => value)
+          .map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+      </dl>
+      <p className="small-caption">
+        Customer details stay with Solid Connect admin. Coordinate with
+        advertisers separately.
+      </p>
+      {entry.email && (
+        <a
+          className="text-link"
+          href={`mailto:${encodeURIComponent(entry.email)}?subject=${encodeURIComponent(`Solid Connect enquiry ${entry.id}`)}`}
+        >
+          Reply by email ↗
+        </a>
+      )}
+      {entry.userId && (
+        <>
+          <div className="message-history">
+            {messages.map((message) => (
+              <div className="message-bubble" key={message.id}>
+                {message.text}
+                <small>
+                  {message.userId === entry.userId
+                    ? "Requester"
+                    : "Solid Connect admin"}{" "}
+                  ·{" "}
+                  {new Date(message.createdAt).toLocaleString("en-GB", {
+                    timeZone: "UTC",
+                  })}{" "}
+                  UTC
+                </small>
+              </div>
+            ))}
+          </div>
+          <form
+            noValidate
+            className="message-compose"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (busy || !text.trim()) return;
+              setBusy(true);
+              setError("");
+              try {
+                await api("message", { conversationId: entry.id, text });
+                setText("");
+                await reload();
+              } catch (error) {
+                setError((error as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <TextField
+              label="Reply as Solid Connect admin"
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              fullWidth
+            />
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={busy || !text.trim()}
+            >
+              {busy ? "Sending…" : "Send reply"}
+            </Button>
+          </form>
+        </>
+      )}
+
       {error && <Alert severity="error">{error}</Alert>}
     </div>
   );

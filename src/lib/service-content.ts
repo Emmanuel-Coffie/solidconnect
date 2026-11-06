@@ -133,7 +133,7 @@ export const serviceContent: Record<string, ServiceContent> = {
       {
         question: "Can I request a custom piece?",
         answer:
-          "Yes. Open a relevant artisan listing and send an enquiry with your design idea, dimensions, materials, budget, and timeline. The provider can follow up through the conversation in your dashboard.",
+          "Yes. Open a relevant artisan listing and send an enquiry with your design idea, dimensions, materials, budget, and timeline. Solid Connect admin will coordinate the conversation and follow up with you.",
       },
       {
         question: "Is the displayed price the final project cost?",
@@ -144,14 +144,14 @@ export const serviceContent: Record<string, ServiceContent> = {
   },
   logistics: {
     introduction:
-      "A supply chain is only as strong as the connections between its stages. Solid Connect brings road, air, and sea freight, storage, fulfilment, and last-mile delivery into one coordinated conversation.",
+      "Moving out, relocating an office, hiring a car, or sending a delivery? Solid Connect admin coordinates home and office moves, car rentals, vans, trucks, drivers, freight and fulfilment through one request.",
     audience:
-      "For businesses moving stock, importers arranging cargo, growing retailers fulfilling orders, and customers planning a shipment that needs careful coordination.",
+      "For people moving out of a home, families relocating, customers renting vehicles, and businesses moving offices, stock or cargo.",
     capabilities: [
-      "Coordinate domestic and international freight by road, air, or sea. Discuss carrier options, collection, documentation, customs coordination, and the delivery handover for your route.",
-      "Plan storage, stock handling, inventory management, order processing, and fulfilment around the volume and frequency your business needs.",
-      "Arrange the final journey from a hub or warehouse to a store, business, or customer. Confirm delivery windows, handling needs, and the information required at the destination.",
-      "Review your current logistics process to identify avoidable handovers, unreliable lead times, capacity gaps, and opportunities to improve cost visibility.",
+      "Arrange home and office moves, including loading, packing, stairs, access restrictions and vehicle capacity. Tell admin your collection point, destination and moving date.",
+      "Request car rentals, self-drive or chauffeur options. Specify dates, duration, passenger count and whether you need a driver. Admin confirms availability and requirements.",
+      "Hire vans, trucks or moving vehicles matched to your load. Include dimensions, collection and delivery locations, loading help and access needs.",
+      "Coordinate courier deliveries, domestic and international freight, storage and fulfilment. Confirm route, documentation, handling and delivery windows with admin.",
     ],
     outcomes: [
       {
@@ -169,8 +169,8 @@ export const serviceContent: Record<string, ServiceContent> = {
     ],
     process: [
       {
-        title: "Describe the shipment",
-        text: "Provide the route, goods, weight, volume, and required dates.",
+        title: "Describe your move or rental",
+        text: "Choose moving, rental, delivery or freight. Include locations, vehicle or load requirements and dates.",
       },
       {
         title: "Review the options",
@@ -193,9 +193,9 @@ export const serviceContent: Record<string, ServiceContent> = {
     ],
     faqs: [
       {
-        question: "Can you help with both local and international shipments?",
+        question: "Can I arrange a house move or rent a car?",
         answer:
-          "The service scope includes domestic and international freight by road, air, and sea, alongside storage, fulfilment, and last-mile delivery. Availability and the final quote depend on the route and cargo.",
+          "Yes. Request home or office relocation, car rentals, a driver, vans or trucks as well as local deliveries and international freight. Admin confirms availability, requirements and the quote before arrangements are made.",
       },
       {
         question: "What affects a logistics quotation?",

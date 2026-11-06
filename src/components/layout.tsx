@@ -109,31 +109,31 @@ export function Header() {
               <>
                 <IconButton
                   component={Link}
-                  href="/dashboard/notifications"
+                  href="/portal/notifications"
                   aria-label="Notifications"
                 >
                   <NotificationsNone />
                 </IconButton>
-                <Link
-                  className="avatar"
-                  href="/dashboard"
-                  title="Open dashboard"
-                >
+                <Link className="avatar" href="/portal" title="Open dashboard">
                   {user.name.slice(0, 1)}
                 </Link>
               </>
             ) : (
               <>
-                <LinkButton href="/login" variant="outlined" className="signin">
-                  Sign In
+                <LinkButton
+                  href="/portal/login"
+                  variant="outlined"
+                  className="signin"
+                >
+                  Advertiser portal
                 </LinkButton>
                 <LinkButton
-                  href="/register"
+                  href="/portal/register"
                   variant="contained"
                   color="secondary"
                   className="get-started"
                 >
-                  Get Started
+                  Advertise with us
                 </LinkButton>
               </>
             )}
@@ -172,9 +172,9 @@ export function Header() {
             ))
           : (menu === "business"
               ? [
-                  ["Business dashboard", "/dashboard"],
-                  ["Post a listing", "/dashboard/listings/new"],
-                  ["Plans & pricing", "/pricing"],
+                  ["Business dashboard", "/portal"],
+                  ["Post a listing", "/portal/listings/new"],
+                  ["Advertise products & services", "/portal/listings/new"],
                 ]
               : [
                   ["Insights & resources", "/resources"],
@@ -203,11 +203,11 @@ export function Header() {
             ["About", "/about"],
             ["Services", "/services"],
             ["Marketplace", "/marketplace"],
-            ["Dashboard", "/dashboard"],
+            ["Dashboard", "/portal"],
             ["Resources", "/resources"],
             ["Contact", "/contact"],
             ["Track a shipment", "/track"],
-            ["Sign in", "/login"],
+            ["Sign in", "/portal/login"],
           ].map(([label, url]) => (
             <Link key={url} href={url} onClick={() => setDrawer(false)}>
               {label}
@@ -287,7 +287,7 @@ export function Footer() {
             links: [
               ["About us", "/about"],
               ["Contact", "/contact"],
-              ["Plans & pricing", "/pricing"],
+              ["Advertise products & services", "/portal/listings/new"],
             ],
           },
           {
@@ -309,7 +309,6 @@ export function Footer() {
               ["Terms", "/terms"],
               ["Privacy", "/privacy"],
               ["Cookies", "/cookies"],
-              ["Refunds", "/refunds"],
             ],
           },
         ].map((col) => (

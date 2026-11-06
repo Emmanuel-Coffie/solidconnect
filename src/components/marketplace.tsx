@@ -24,7 +24,7 @@ import Close from "@mui/icons-material/Close";
 import VerifiedOutlined from "@mui/icons-material/VerifiedOutlined";
 import ShareOutlined from "@mui/icons-material/ShareOutlined";
 import { type Listing, photo, money, services, articles } from "@/lib/catalog";
-import { api, useAuth } from "./providers";
+import { api } from "./providers";
 import { ListingCard } from "./cards";
 import { RequestForm } from "./forms";
 export function Marketplace({
@@ -50,6 +50,7 @@ export function Marketplace({
     "Products",
     "Logistics",
     "Business Services",
+    "Services",
   ].includes(categoryValue)
     ? categoryValue
     : "All";
@@ -115,12 +116,22 @@ export function Marketplace({
         title={
           searchPage
             ? "Find your next connection."
-            : "People. Products. Possibilities."
+            : "Products. Services. Your next connection."
         }
-        description="Find the talent, spaces, services, and partners to take your next step."
+        description="Shop products, find skilled services, or arrange your next move. No account needed — our admin team takes it from there."
       />
       <section className="workspace">
         <div className="container">
+          <div className="concierge-strip">
+            <div>
+              <b>Find it here. We’ll take it from there.</b>
+              <p>
+                Choose a product or service and send your request. Solid Connect
+                admin manages the conversation, availability and next steps.
+              </p>
+            </div>
+            <Link href="/portal/listings/new">Advertise your business ↗</Link>
+          </div>
           <div className="market-tabs">
             <Tabs
               value={selected}
@@ -137,6 +148,7 @@ export function Marketplace({
                 "Products",
                 "Logistics",
                 "Business Services",
+                "Services",
               ].map((c) => (
                 <Tab key={c} value={c} label={c} />
               ))}
@@ -317,7 +329,7 @@ export function Marketplace({
                 <span>
                   <b>{filtered.length}</b> opportunities to explore
                 </span>
-                <Link className="text-link" href="/dashboard/listings/new">
+                <Link className="text-link" href="/portal/listings/new">
                   Post a listing
                 </Link>
               </div>
@@ -368,7 +380,6 @@ export function Marketplace({
   );
 }
 export function ListingDetail({ id }: { id: string }) {
-  const { user } = useAuth();
   const [listing, setListing] = useState<Listing | null>(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
@@ -400,7 +411,9 @@ export function ListingDetail({ id }: { id: string }) {
     ? "Apply for this role"
     : listing.category === "Properties"
       ? "Schedule a viewing"
-      : "Request a quote";
+      : listing.category === "Products"
+        ? "Enquire to buy"
+        : "Request this service";
   const kind = job
     ? "Job application"
     : listing.category === "Properties"
@@ -483,8 +496,8 @@ export function ListingDetail({ id }: { id: string }) {
               {shared ? "Link copied" : "Share opportunity"}
             </Button>
             <p className="small-caption" style={{ marginTop: 20 }}>
-              Start a conversation to confirm availability, scope, and pricing
-              with the provider.
+              No account needed. Solid Connect admin handles your enquiry and
+              coordinates availability with the advertiser.
             </p>
           </aside>
         </div>
@@ -502,23 +515,7 @@ export function ListingDetail({ id }: { id: string }) {
           </IconButton>
         </DialogTitle>
         <DialogContent>
-          {user ? (
-            <RequestForm kind={kind} listingId={id} subject={listing.title} />
-          ) : (
-            <>
-              <p>
-                Sign in to keep track of this {job ? "application" : "enquiry"}{" "}
-                and your conversation with the provider.
-              </p>
-              <LinkButton
-                href={`/login?next=/marketplace/${id}`}
-                variant="contained"
-                sx={{ mt: 3 }}
-              >
-                Sign in to continue
-              </LinkButton>
-            </>
-          )}
+          <RequestForm kind={kind} listingId={id} subject={listing.title} />
         </DialogContent>
       </Dialog>
     </section>

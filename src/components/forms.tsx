@@ -6,30 +6,15 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import {
-  Button,
-  TextField,
-  MenuItem,
-  Alert,
-  IconButton,
-} from "@mui/material";
+import { Button, TextField, MenuItem, Alert, IconButton } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
-import {
-  requestSchema,
-  safeReturn,
-} from "@/lib/validation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { requestSchema, safeReturn } from "@/lib/validation";
 import { services } from "@/lib/catalog";
-import {
-  api,
-  useAuth,
-} from "./providers";
+import { api, useAuth } from "./providers";
 import { Logo } from "./layout";
 
 export function RequestForm({
@@ -44,27 +29,16 @@ export function RequestForm({
   onSuccess?: () => void;
 }) {
   const { user } = useAuth();
-  const [error, setError] =
-    useState("");
-  const [reference, setReference] =
-    useState("");
-  const [details, setDetails] =
-    useState<Record<string, string>>(
-      {},
-    );
+  const [error, setError] = useState("");
+  const [reference, setReference] = useState("");
+  const [details, setDetails] = useState<Record<string, string>>({});
 
   const {
     register,
     handleSubmit,
-    formState: {
-      errors,
-      isSubmitting,
-    },
-  } = useForm<
-    z.infer<typeof requestSchema>
-  >({
-    resolver:
-      zodResolver(requestSchema),
+    formState: { errors, isSubmitting },
+  } = useForm<z.infer<typeof requestSchema>>({
+    resolver: zodResolver(requestSchema),
     defaultValues: {
       kind,
       name: user?.name ?? "",
@@ -75,24 +49,22 @@ export function RequestForm({
     },
   });
 
-  const logistics =
-    /logistics/i.test(kind);
-  const trade =
-    /trade|import/i.test(kind);
-  const marketing =
-    /marketing|strategy/i.test(kind);
-  const property =
-    /viewing|property/i.test(kind);
-  const artisan =
-    /artisan|project/i.test(kind);
-  const apply =
-    /application/i.test(kind);
+  const logistics = /logistics/i.test(kind);
+  const trade = /trade|import/i.test(kind);
+  const marketing = /marketing|strategy/i.test(kind);
+  const property = /viewing|property/i.test(kind);
+  const artisan = /artisan|project/i.test(kind);
+  const apply = /application/i.test(kind);
 
   const extra = logistics
     ? [
         "Origin",
         "Destination",
-        "Shipment type",
+        "Vehicle type",
+        "Passengers or load details",
+        "Rental duration",
+        "Driver required",
+        "Access, stairs or packing needs",
         "Weight (kg)",
         "Volume (m³)",
         "Transport mode",
@@ -116,22 +88,11 @@ export function RequestForm({
             "Timeline",
           ]
         : property
-          ? [
-              "Preferred viewing date",
-              "Preferred time",
-              "Buying or renting",
-            ]
+          ? ["Preferred viewing date", "Preferred time", "Buying or renting"]
           : artisan
-            ? [
-                "Project type",
-                "Budget range",
-                "Project deadline",
-              ]
+            ? ["Project type", "Budget range", "Project deadline"]
             : apply
-              ? [
-                  "Experience",
-                  "Portfolio or CV link",
-                ]
+              ? ["Experience", "Portfolio or CV link"]
               : [];
 
   if (reference)
@@ -139,23 +100,15 @@ export function RequestForm({
       <Alert severity="success">
         <b>Request received.</b>
 
-        <p>
-          Reference:{" "}
-          {reference
-            .slice(0, 8)
-            .toUpperCase()}
-        </p>
+        <p>Reference: {reference}</p>
 
         <p>
-          {user
-            ? "You can follow up in your dashboard."
-            : "Your enquiry has been recorded."}
+          The Solid Connect admin team will contact you using the details you
+          supplied. Keep this reference for follow-up.
         </p>
 
         {user && (
-          <LinkButton href="/dashboard/requests">
-            View my requests
-          </LinkButton>
+          <LinkButton href="/portal/requests">View my requests</LinkButton>
         )}
       </Alert>
     );
@@ -164,46 +117,33 @@ export function RequestForm({
     <form
       className="form-stack"
       noValidate
-      onSubmit={handleSubmit(
-        async (values) => {
-          setError("");
+      onSubmit={handleSubmit(async (values) => {
+        setError("");
 
-          try {
-            const result = await api<{
-              entry: {
-                id: string;
-              };
-            }>(
-              user
-                ? "request"
-                : "contact",
-              {
-                ...values,
-                details,
-              },
-            );
+        try {
+          const result = await api<{
+            entry: {
+              id: string;
+            };
+          }>("request", {
+            ...values,
+            details,
+          });
 
-            setReference(
-              result.entry.id,
-            );
+          setReference(result.entry.id);
 
-            onSuccess?.();
-          } catch (e) {
-            setError(
-              (e as Error).message,
-            );
-          }
-        },
-      )}
+          onSuccess?.();
+        } catch (e) {
+          setError((e as Error).message);
+        }
+      })}
     >
       <div className="form-grid">
         <TextField
           label="Full name"
           {...register("name")}
           error={!!errors.name}
-          helperText={
-            errors.name?.message
-          }
+          helperText={errors.name?.message}
         />
 
         <TextField
@@ -211,40 +151,51 @@ export function RequestForm({
           type="email"
           {...register("email")}
           error={!!errors.email}
-          helperText={
-            errors.email?.message
-          }
+          helperText={errors.email?.message}
         />
 
-        <TextField
-          label="Phone number (optional)"
-          {...register("phone")}
-        />
+        <TextField label="Phone number (optional)" {...register("phone")} />
 
         <TextField
           label="Subject"
           {...register("subject")}
           error={!!errors.subject}
-          helperText={
-            errors.subject?.message
-          }
+          helperText={errors.subject?.message}
         />
 
+        {logistics && (
+          <TextField
+            select
+            label="Logistics service"
+            value={details["Service required"] ?? ""}
+            onChange={(event) =>
+              setDetails({ ...details, "Service required": event.target.value })
+            }
+          >
+            {[
+              "Home move / moving out",
+              "Office relocation",
+              "Car rental",
+              "Chauffeur / passenger transport",
+              "Van or truck hire",
+              "Courier / delivery",
+              "Freight / import-export",
+              "Storage / fulfilment",
+              "Other logistics",
+            ].map((service) => (
+              <MenuItem key={service} value={service}>
+                {service}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
         {extra.map((label) => (
           <TextField
             key={label}
             label={label}
-            type={
-              /date|deadline/i.test(
-                label,
-              )
-                ? "date"
-                : "text"
-            }
+            type={/date|deadline/i.test(label) ? "date" : "text"}
             slotProps={
-              /date|deadline/i.test(
-                label,
-              )
+              /date|deadline/i.test(label)
                 ? {
                     inputLabel: {
                       shrink: true,
@@ -252,14 +203,11 @@ export function RequestForm({
                   }
                 : undefined
             }
-            value={
-              details[label] ?? ""
-            }
+            value={details[label] ?? ""}
             onChange={(e) =>
               setDetails({
                 ...details,
-                [label]:
-                  e.target.value,
+                [label]: e.target.value,
               })
             }
           />
@@ -270,37 +218,22 @@ export function RequestForm({
           multiline
           minRows={4}
           label={
-            apply
-              ? "Tell us why you are a good fit"
-              : "Tell us what you need"
+            apply ? "Tell us why you are a good fit" : "Tell us what you need"
           }
           {...register("message")}
           error={!!errors.message}
-          helperText={
-            errors.message?.message
-          }
+          helperText={errors.message?.message}
         />
       </div>
 
-      {!user &&
-        kind !==
-          "General enquiry" && (
-          <Alert severity="info">
-            This will be recorded
-            as a guest enquiry.{" "}
-            <Link href="/login">
-              Sign in
-            </Link>{" "}
-            to track requests and
-            messages in your dashboard.
-          </Alert>
-        )}
-
-      {error && (
-        <Alert severity="error">
-          {error}
+      {!user && kind !== "General enquiry" && (
+        <Alert severity="info">
+          No account needed. Your request goes to Solid Connect admin, who will
+          coordinate availability and next steps.
         </Alert>
       )}
+
+      {error && <Alert severity="error">{error}</Alert>}
 
       <Button
         type="submit"
@@ -316,11 +249,8 @@ export function RequestForm({
       </Button>
 
       <p className="small-caption">
-        By sending this request,
-        you agree to share these
-        details with Solid Connect
-        and the relevant service
-        provider.
+        By sending this request, you agree to share these details with the Solid
+        Connect admin team so they can coordinate your request.
       </p>
     </form>
   );
@@ -343,21 +273,15 @@ export function Contact() {
               Let’s connect
             </div>
 
-            <h2>
-              Tell us what’s next.
-            </h2>
+            <h2>Tell us what’s next.</h2>
 
             <p
               style={{
                 margin: "20px 0",
               }}
             >
-              A new hire. A new
-              market. A place to
-              call your own.
-              Whatever you have in
-              mind, we’re ready to
-              start a conversation.
+              A new hire. A new market. A place to call your own. Whatever you
+              have in mind, we’re ready to start a conversation.
             </p>
 
             <div className="contact-photo">
@@ -370,38 +294,19 @@ export function Contact() {
             </div>
 
             <div className="panel">
-              <h3>
-                One team. Seven
-                ways to help.
-              </h3>
+              <h3>One team. Seven ways to help.</h3>
 
               <p>
-                Choose the service
-                that fits your
-                needs, or tell us
-                about a challenge
-                that brings several
-                together.
+                Choose the service that fits your needs, or tell us about a
+                challenge that brings several together.
               </p>
 
               <ul>
-                {services.map(
-                  (s) => (
-                    <li
-                      key={
-                        s.slug
-                      }
-                    >
-                      <Link
-                        href={`/services/${s.slug}`}
-                      >
-                        {
-                          s.name
-                        }
-                      </Link>
-                    </li>
-                  ),
-                )}
+                {services.map((s) => (
+                  <li key={s.slug}>
+                    <Link href={`/services/${s.slug}`}>{s.name}</Link>
+                  </li>
+                ))}
               </ul>
 
               <h3
@@ -413,43 +318,22 @@ export function Contact() {
               </h3>
 
               <p>
-                Start with the
-                outcome you are
-                looking for, the
-                service you need,
-                and any important
-                location, budget,
-                or timing details.
-                Your enquiry
-                creates a reference
-                that keeps the
-                conversation
-                connected to your
-                request.
+                Start with the outcome you are looking for, the service you
+                need, and any important location, budget, or timing details.
+                Your enquiry creates a reference that keeps the conversation
+                connected to your request.
               </p>
 
               <p>
-                If you have an
-                account, you can
-                follow up in My
-                Requests and
-                Messages. Before
-                any work begins,
-                confirm the scope,
-                availability,
-                fees, and next
-                steps with the
-                relevant provider.
+                If you have an account, you can follow up in My Requests and
+                Messages. Before any work begins, confirm the scope,
+                availability, fees, and next steps with the Solid Connect admin
+                team.
               </p>
 
               <p className="small-caption">
-                Contact details and
-                office location are
-                awaiting company
-                confirmation. Use
-                this form to record
-                an enquiry in the
-                demo.
+                Contact details and office location are awaiting company
+                confirmation. Use this form to record an enquiry in the demo.
               </p>
             </div>
           </div>
@@ -467,86 +351,51 @@ export function Contact() {
 export function AuthForm({
   mode,
 }: {
-  mode:
-    | "login"
-    | "register"
-    | "forgot"
-    | "reset";
+  mode: "login" | "register" | "forgot" | "reset";
 }) {
   const { refresh } = useAuth();
   const router = useRouter();
-  const params =
-    useSearchParams();
+  const params = useSearchParams();
 
-  const [type, setType] =
-    useState("Individual");
+  const [type, setType] = useState("Individual");
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  const [success, setSuccess] =
-    useState("");
+  const [success, setSuccess] = useState("");
 
-  const [show, setShow] =
-    useState(false);
+  const [show, setShow] = useState(false);
 
   const schema = z.object({
     name:
       mode === "register"
-        ? z
-            .string()
-            .min(
-              2,
-              "Enter your full name.",
-            )
+        ? z.string().min(2, "Enter your full name.")
         : z.string(),
 
     email:
-      mode === "reset"
-        ? z.string()
-        : z.email(
-            "Enter a valid email address.",
-          ),
+      mode === "reset" ? z.string() : z.email("Enter a valid email address."),
 
     password:
       mode === "forgot"
         ? z.string()
         : mode === "login"
-          ? z
-              .string()
-              .min(
-                1,
-                "Enter your password.",
-              )
-          : z
-              .string()
-              .min(
-                10,
-                "Use at least 10 characters.",
-              )
-              .max(100),
+          ? z.string().min(1, "Enter your password.")
+          : z.string().min(10, "Use at least 10 characters.").max(100),
 
-    accountType:
-      z.string(),
+    accountType: z.string(),
   });
 
   const {
     register,
     handleSubmit,
-    formState: {
-      errors,
-      isSubmitting,
-    },
+    formState: { errors, isSubmitting },
   } = useForm({
-    resolver:
-      zodResolver(schema),
+    resolver: zodResolver(schema),
 
     defaultValues: {
       name: "",
       email: "",
       password: "",
-      accountType:
-        "Individual",
+      accountType: "Individual",
     },
   });
 
@@ -571,9 +420,7 @@ export function AuthForm({
           />
 
           <div>
-            <div className="eyebrow">
-              Make your next move
-            </div>
+            <div className="eyebrow">Make your next move</div>
 
             <h2>
               Opportunity starts
@@ -582,10 +429,7 @@ export function AuthForm({
             </h2>
 
             <p>
-              Find your people.
-              Grow your business.
-              Build something that
-              lasts.
+              Find your people. Grow your business. Build something that lasts.
             </p>
           </div>
         </div>
@@ -597,29 +441,19 @@ export function AuthForm({
 
           <p>
             {mode === "register"
-              ? "Create your account. Discover a world of possibilities."
+              ? "Create an advertiser account to promote your products and services. Customers can enquire without signing in."
               : mode === "login"
                 ? "Sign in to pick up where you left off."
                 : "We’ll help you get back to your connections."}
           </p>
 
-          {mode ===
-            "register" && (
+          {mode === "register" && (
             <div className="auth-type">
-              {[
-                "Individual",
-                "Business",
-              ].map((t) => (
+              {["Individual", "Business"].map((t) => (
                 <Button
                   key={t}
-                  variant={
-                    type === t
-                      ? "contained"
-                      : "outlined"
-                  }
-                  onClick={() =>
-                    setType(t)
-                  }
+                  variant={type === t ? "contained" : "outlined"}
+                  onClick={() => setType(t)}
                   fullWidth
                 >
                   {t}
@@ -631,134 +465,69 @@ export function AuthForm({
           <form
             noValidate
             className="form-stack"
-            onSubmit={handleSubmit(
-              async (
-                values,
-              ) => {
-                setError("");
+            onSubmit={handleSubmit(async (values) => {
+              setError("");
 
-                try {
-                  const result =
-                    await api<{
-                      message?: string;
-                    }>(
-                      mode,
-                      {
-                        ...values,
-                        accountType:
-                          type,
-                        token:
-                          params.get(
-                            "token",
-                          ),
-                      },
-                    );
+              try {
+                const result = await api<{
+                  message?: string;
+                }>(mode, {
+                  ...values,
+                  accountType: type,
+                  token: params.get("token"),
+                });
 
-                  if (
-                    mode ===
-                    "forgot"
-                  ) {
-                    setSuccess(
-                      result.message ??
-                        "Check your email.",
-                    );
+                if (mode === "forgot") {
+                  setSuccess(result.message ?? "Check your email.");
 
-                    return;
-                  }
-
-                  if (
-                    mode ===
-                    "reset"
-                  ) {
-                    setSuccess(
-                      "Password updated. You can now sign in.",
-                    );
-
-                    return;
-                  }
-
-                  await refresh();
-
-                  router.push(
-                    safeReturn(
-                      params.get(
-                        "next",
-                      ),
-                    ),
-                  );
-                } catch (e) {
-                  setError(
-                    (
-                      e as Error
-                    ).message,
-                  );
+                  return;
                 }
-              },
-            )}
+
+                if (mode === "reset") {
+                  setSuccess("Password updated. You can now sign in.");
+
+                  return;
+                }
+
+                await refresh();
+
+                router.push(safeReturn(params.get("next")));
+              } catch (e) {
+                setError((e as Error).message);
+              }
+            })}
           >
-            {mode ===
-              "register" && (
+            {mode === "register" && (
               <TextField
                 label="Full name"
                 autoComplete="name"
-                {...register(
-                  "name",
-                )}
-                error={
-                  !!errors.name
-                }
-                helperText={
-                  errors.name
-                    ?.message
-                }
+                {...register("name")}
+                error={!!errors.name}
+                helperText={errors.name?.message}
               />
             )}{" "}
-
-            {mode !==
-              "reset" && (
+            {mode !== "reset" && (
               <TextField
                 label="Email address"
                 type="email"
                 autoComplete="email"
-                {...register(
-                  "email",
-                )}
-                error={
-                  !!errors.email
-                }
-                helperText={
-                  errors.email
-                    ?.message
-                }
+                {...register("email")}
+                error={!!errors.email}
+                helperText={errors.email?.message}
               />
             )}{" "}
-
-            {mode !==
-              "forgot" && (
+            {mode !== "forgot" && (
               <TextField
                 label="Password"
-                type={
-                  show
-                    ? "text"
-                    : "password"
-                }
+                type={show ? "text" : "password"}
                 autoComplete={
-                  mode ===
-                  "login"
-                    ? "current-password"
-                    : "new-password"
+                  mode === "login" ? "current-password" : "new-password"
                 }
-                {...register(
-                  "password",
-                )}
-                error={
-                  !!errors.password
-                }
+                {...register("password")}
+                error={!!errors.password}
                 helperText={
-                  errors.password
-                    ?.message ??
-                  (mode ===
-                  "register"
+                  errors.password?.message ??
+                  (mode === "register"
                     ? "Use at least 10 characters."
                     : undefined)
                 }
@@ -766,114 +535,65 @@ export function AuthForm({
                   input: {
                     endAdornment: (
                       <IconButton
-                        aria-label={
-                          show
-                            ? "Hide password"
-                            : "Show password"
-                        }
-                        onClick={() =>
-                          setShow(
-                            !show,
-                          )
-                        }
+                        aria-label={show ? "Hide password" : "Show password"}
+                        onClick={() => setShow(!show)}
                       >
-                        {show ? (
-                          <VisibilityOff />
-                        ) : (
-                          <Visibility />
-                        )}
+                        {show ? <VisibilityOff /> : <Visibility />}
                       </IconButton>
                     ),
                   },
                 }}
               />
             )}
-
-            {mode ===
-              "login" && (
-              <Link
-                className="text-link"
-                href="/forgot-password"
-              >
+            {mode === "login" && (
+              <Link className="text-link" href="/portal/forgot-password">
                 Forgot password?
               </Link>
             )}
-
-            {error && (
-              <Alert severity="error">
-                {error}
-              </Alert>
-            )}
-
-            {success && (
-              <Alert severity="success">
-                {success}
-              </Alert>
-            )}
-
+            {error && <Alert severity="error">{error}</Alert>}
+            {success && <Alert severity="success">{success}</Alert>}
             <Button
               variant="contained"
               color="secondary"
               type="submit"
-              disabled={
-                isSubmitting
-              }
+              disabled={isSubmitting}
             >
               {isSubmitting
                 ? "Please wait…"
-                : mode ===
-                    "register"
+                : mode === "register"
                   ? "Create account"
-                  : mode ===
-                      "forgot"
+                  : mode === "forgot"
                     ? "Send reset link"
-                    : mode ===
-                        "reset"
+                    : mode === "reset"
                       ? "Update password"
                       : "Sign in"}
             </Button>
           </form>
 
           <div className="auth-alt">
-            {mode ===
-            "login" ? (
+            {mode === "login" ? (
               <>
-                New to Solid
-                Connect?{" "}
-                <Link href="/register">
-                  Create an account
-                </Link>
+                New to Solid Connect?{" "}
+                <Link href="/portal/register">Create an account</Link>
               </>
             ) : (
               <>
-                Already have an
-                account?{" "}
-                <Link href="/login">
-                  Sign in
-                </Link>
+                Already have an account?{" "}
+                <Link href="/portal/login">Sign in</Link>
               </>
             )}
           </div>
 
-          {mode ===
-            "register" && (
+          {mode === "register" && (
             <p
               className="small-caption"
               style={{
                 marginTop: 20,
               }}
             >
-              By creating an
-              account, you agree to
-              our{" "}
-              <Link href="/terms">
-                Terms
-              </Link>{" "}
-              and{" "}
-              <Link href="/privacy">
-                Privacy Policy
-              </Link>
-              .
+              By creating an account, you agree to our{" "}
+              <Link href="/terms">Terms</Link> and{" "}
+              <Link href="/privacy">Privacy Policy</Link>.
             </p>
           )}
         </div>
@@ -887,18 +607,14 @@ export function CategorySelect({
   onChange,
 }: {
   value: string;
-  onChange: (
-    value: string,
-  ) => void;
+  onChange: (value: string) => void;
 }) {
   return (
     <TextField
       select
       label="Category"
       value={value}
-      onChange={(e) =>
-        onChange(e.target.value)
-      }
+      onChange={(e) => onChange(e.target.value)}
     >
       {[
         "Jobs",
@@ -907,11 +623,9 @@ export function CategorySelect({
         "Products",
         "Logistics",
         "Business Services",
+        "Services",
       ].map((x) => (
-        <MenuItem
-          key={x}
-          value={x}
-        >
+        <MenuItem key={x} value={x}>
           {x}
         </MenuItem>
       ))}
@@ -927,116 +641,82 @@ export function CategorySelect({
  * already have an active login session.
  */
 export function VerifyEmail() {
-  const params =
-    useSearchParams();
+  const params = useSearchParams();
 
-  const {
-    user,
-    loading,
-    refresh,
-  } = useAuth();
+  const { user, loading, refresh } = useAuth();
 
-  const [busy, setBusy] =
-    useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  const [message, setMessage] =
-    useState("");
+  const [message, setMessage] = useState("");
 
-  const token =
-    params.get("token");
+  const token = params.get("token");
 
-  const verifyEmail =
-    async () => {
-      if (!token) return;
+  const verifyEmail = async () => {
+    if (!token) return;
 
-      setBusy(true);
-      setError("");
-      setMessage("");
+    setBusy(true);
+    setError("");
+    setMessage("");
 
-      try {
-        const response =
-          await api<{
-            message: string;
-          }>(
-            "verify-email",
-            { token },
-          );
+    try {
+      const response = await api<{
+        message: string;
+      }>("verify-email", { token });
 
-        setMessage(
-          response.message,
-        );
+      setMessage(response.message);
 
-        /*
-         * If the user is currently logged in,
-         * refresh the session-side account data
-         * so the UI reflects emailVerified=true.
-         *
-         * If they are logged out, refresh is still
-         * safe and the successful verification
-         * message remains visible.
-         */
-        await refresh();
-      } catch (e) {
-        setError(
-          (e as Error).message,
-        );
-      } finally {
-        setBusy(false);
-      }
-    };
+      /*
+       * If the user is currently logged in,
+       * refresh the session-side account data
+       * so the UI reflects emailVerified=true.
+       *
+       * If they are logged out, refresh is still
+       * safe and the successful verification
+       * message remains visible.
+       */
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
-  const sendVerification =
-    async () => {
-      setBusy(true);
-      setError("");
-      setMessage("");
+  const sendVerification = async () => {
+    setBusy(true);
+    setError("");
+    setMessage("");
 
-      try {
-        const response =
-          await api<{
-            message: string;
-          }>(
-            "send-verification",
-            {},
-          );
+    try {
+      const response = await api<{
+        message: string;
+      }>("send-verification", {});
 
-        setMessage(
-          response.message,
-        );
-      } catch (e) {
-        setError(
-          (e as Error).message,
-        );
-      } finally {
-        setBusy(false);
-      }
-    };
+      setMessage(response.message);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <section className="workspace">
       <div className="panel wide-form">
-        <h1>
-          Verify your email
-        </h1>
+        <h1>Verify your email</h1>
 
         <p
           style={{
             margin: "20px 0",
           }}
         >
-          Confirm your email
-          address to keep your
-          account details up to
-          date.
+          Confirm your email address to keep your account details up to date.
         </p>
 
         {loading ? (
-          <p>
-            Loading…
-          </p>
+          <p>Loading…</p>
         ) : token ? (
           /*
            * A token in the URL is enough to
@@ -1047,16 +727,10 @@ export function VerifyEmail() {
            */
           <Button
             variant="contained"
-            disabled={
-              busy || !!message
-            }
-            onClick={
-              verifyEmail
-            }
+            disabled={busy || !!message}
+            onClick={verifyEmail}
           >
-            {busy
-              ? "Verifying…"
-              : "Confirm email address"}
+            {busy ? "Verifying…" : "Confirm email address"}
           </Button>
         ) : user ? (
           /*
@@ -1066,16 +740,10 @@ export function VerifyEmail() {
            */
           <Button
             variant="contained"
-            disabled={
-              busy || !!message
-            }
-            onClick={
-              sendVerification
-            }
+            disabled={busy || !!message}
+            onClick={sendVerification}
           >
-            {busy
-              ? "Sending…"
-              : "Send verification link"}
+            {busy ? "Sending…" : "Send verification link"}
           </Button>
         ) : (
           /*
@@ -1083,49 +751,34 @@ export function VerifyEmail() {
            * must sign in before requesting a
            * verification email.
            */
-          <LinkButton href="/login">
-            Sign in to send a
-            verification email
+          <LinkButton href="/portal/login">
+            Sign in to send a verification email
           </LinkButton>
         )}
 
         {error && (
-          <Alert
-            severity="error"
-            sx={{ mt: 3 }}
-          >
+          <Alert severity="error" sx={{ mt: 3 }}>
             {error}
           </Alert>
         )}
 
         {message && (
-          <Alert
-            severity="success"
-            sx={{ mt: 3 }}
-          >
+          <Alert severity="success" sx={{ mt: 3 }}>
             {message}
           </Alert>
         )}
 
         {user && (
-          <LinkButton
-            href="/dashboard/profile"
-            sx={{ mt: 2 }}
-          >
+          <LinkButton href="/portal/profile" sx={{ mt: 2 }}>
             Back to profile
           </LinkButton>
         )}
 
-        {!user &&
-          token &&
-          message && (
-            <LinkButton
-              href="/login"
-              sx={{ mt: 2 }}
-            >
-              Sign in
-            </LinkButton>
-          )}
+        {!user && token && message && (
+          <LinkButton href="/portal/login" sx={{ mt: 2 }}>
+            Sign in
+          </LinkButton>
+        )}
       </div>
     </section>
   );

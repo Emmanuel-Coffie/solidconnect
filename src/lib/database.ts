@@ -41,7 +41,10 @@ export async function readDatabase(db: DB): Promise<State> {
     })),
     listings: listings.length
       ? listings.map((l) => l.payload as unknown as Listing)
-      : structuredClone(seedListings),
+      : process.env.NODE_ENV === "production" &&
+          process.env.ALLOW_LOCAL_DEMO !== "true"
+        ? []
+        : structuredClone(seedListings),
     requests: requests.map(
       (r) => r.payload as unknown as State["requests"][number],
     ),

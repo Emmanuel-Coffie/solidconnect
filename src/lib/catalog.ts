@@ -36,18 +36,19 @@ export const services = [
   {
     slug: "logistics",
     name: "Logistics",
-    headline: "Get your goods where they need to be.",
-    description: "Freight, fulfilment and delivery. Connected from end to end.",
+    headline: "Moving homes, people, and goods.",
+    description:
+      "House moves, car rentals, vehicle hire, deliveries and freight — coordinated by one team.",
     image: "photo-1578575437130-527eed3abbec",
     icon: "shipping",
     color: "#008b83",
     category: "Logistics",
     cta: "Request a quote",
     capabilities: [
-      "Freight forwarding",
-      "Warehousing & fulfilment",
-      "Last-mile delivery",
-      "Supply chain consulting",
+      "Home & office relocation",
+      "Car rentals & chauffeur services",
+      "Vans, trucks & moving vehicles",
+      "Deliveries, freight & fulfilment",
     ],
   },
   {
@@ -126,7 +127,8 @@ export type Category =
   | "Properties"
   | "Products"
   | "Logistics"
-  | "Business Services";
+  | "Business Services"
+  | "Services";
 export type Listing = {
   id: string;
   title: string;
@@ -303,47 +305,6 @@ export const seedListings: Listing[] = [
       Workplace: "On-site",
       Industry: "Logistics",
     },
-  },
-];
-export const plans = [
-  {
-    id: "starter",
-    name: "Starter",
-    monthly: 0,
-    yearly: 0,
-    description: "Make your first connection.",
-    features: [
-      "Create your profile",
-      "Explore the marketplace",
-      "Save opportunities",
-      "Send enquiries",
-    ],
-  },
-  {
-    id: "professional",
-    name: "Professional",
-    monthly: 99,
-    yearly: 950,
-    description: "Create more room to grow.",
-    features: [
-      "Everything in Starter",
-      "Featured listing credit",
-      "Business profile",
-      "Priority enquiry support",
-    ],
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    monthly: 0,
-    yearly: 0,
-    description: "A partnership built around you.",
-    features: [
-      "Dedicated account support",
-      "Team onboarding",
-      "Custom service packages",
-      "Consolidated reporting",
-    ],
   },
 ];
 export const articles = [
