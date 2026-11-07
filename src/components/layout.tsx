@@ -23,9 +23,9 @@ import NotificationsNone from "@mui/icons-material/NotificationsNone";
 import { services } from "@/lib/catalog";
 import { useAuth } from "./providers";
 import { Icon } from "./icon";
-export function Logo() {
+export function Logo({ href = "/" }: { href?: string }) {
   return (
-    <Link href="/" className="logo" aria-label="Solid Connect home">
+    <Link href={href} className="logo" aria-label="Solid Connect home">
       <span className="brand-symbol">
         <Image
           src="/images/solid-connect-logo-original.png"
@@ -109,31 +109,31 @@ export function Header() {
               <>
                 <IconButton
                   component={Link}
-                  href="/dashboard/notifications"
+                  href="/portal/notifications"
                   aria-label="Notifications"
                 >
                   <NotificationsNone />
                 </IconButton>
-                <Link
-                  className="avatar"
-                  href="/dashboard"
-                  title="Open dashboard"
-                >
+                <Link className="avatar" href="/portal" title="Open dashboard">
                   {user.name.slice(0, 1)}
                 </Link>
               </>
             ) : (
               <>
-                <LinkButton href="/login" variant="outlined" className="signin">
-                  Sign In
+                <LinkButton
+                  href="/portal/login"
+                  variant="outlined"
+                  className="signin"
+                >
+                  Advertiser portal
                 </LinkButton>
                 <LinkButton
-                  href="/register"
+                  href="/portal/register"
                   variant="contained"
                   color="secondary"
                   className="get-started"
                 >
-                  Get Started
+                  Advertise with us
                 </LinkButton>
               </>
             )}
@@ -172,14 +172,13 @@ export function Header() {
             ))
           : (menu === "business"
               ? [
-                  ["Business dashboard", "/dashboard"],
-                  ["Post a listing", "/dashboard/listings/new"],
-                  ["Plans & pricing", "/pricing"],
+                  ["Business dashboard", "/portal"],
+                  ["Advertise products & services", "/portal/listings/new"],
                 ]
               : [
                   ["Insights & resources", "/resources"],
                   ["Help & FAQs", "/faq"],
-                  ["Track a shipment", "/track"],
+                  ["Arrange transport", "/services/logistics"],
                 ]
             ).map(([label, url]) => (
               <MenuItem key={url} component={Link} href={url} onClick={close}>
@@ -203,11 +202,11 @@ export function Header() {
             ["About", "/about"],
             ["Services", "/services"],
             ["Marketplace", "/marketplace"],
-            ["Dashboard", "/dashboard"],
+            ["Dashboard", "/portal"],
             ["Resources", "/resources"],
             ["Contact", "/contact"],
-            ["Track a shipment", "/track"],
-            ["Sign in", "/login"],
+            ["Arrange transport", "/services/logistics"],
+            ["Sign in", "/portal/login"],
           ].map(([label, url]) => (
             <Link key={url} href={url} onClick={() => setDrawer(false)}>
               {label}
@@ -287,7 +286,7 @@ export function Footer() {
             links: [
               ["About us", "/about"],
               ["Contact", "/contact"],
-              ["Plans & pricing", "/pricing"],
+              ["Advertise products & services", "/portal/listings/new"],
             ],
           },
           {
@@ -299,7 +298,7 @@ export function Footer() {
             links: [
               ["Marketplace", "/marketplace"],
               ["Resources", "/resources"],
-              ["Track a shipment", "/track"],
+              ["Arrange transport", "/services/logistics"],
               ["Help & FAQs", "/faq"],
             ],
           },
@@ -309,7 +308,6 @@ export function Footer() {
               ["Terms", "/terms"],
               ["Privacy", "/privacy"],
               ["Cookies", "/cookies"],
-              ["Refunds", "/refunds"],
             ],
           },
         ].map((col) => (

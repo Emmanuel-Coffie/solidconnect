@@ -32,6 +32,7 @@ export const listingSchema = z.object({
     "Products",
     "Logistics",
     "Business Services",
+    "Services",
   ]),
   location: z.string().trim().min(2).max(120),
   price: z.coerce.number().min(0).max(100000000),
@@ -49,5 +50,5 @@ export function safeReturn(value: string | null) {
     !value.startsWith("//") &&
     !value.includes("\\")
     ? value
-    : "/dashboard";
+    : "/portal";
 }

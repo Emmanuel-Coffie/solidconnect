@@ -1,13 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
 import {
   registerSchema,
   listingSchema,
   requestSchema,
   safeReturn,
 } from "../src/lib/validation";
-import { validSignature, checkoutProducts } from "../src/lib/payments";
 test("registration rejects weak passwords and privileged roles", () => {
   assert.equal(
     registerSchema.safeParse({
@@ -78,27 +76,9 @@ test("requests require contact details and a meaningful message", () => {
     false,
   );
 });
-test("payment webhook rejects forged or malformed signatures", () => {
-  const body = JSON.stringify({
-    event: "charge.success",
-    data: { reference: "test" },
-  });
-  const secret = "test-key";
-  const signature = createHmac("sha512", secret).update(body).digest("hex");
-  assert.equal(validSignature(body, signature, secret), true);
-  assert.equal(validSignature(body + " ", signature, secret), false);
-  assert.equal(validSignature(body, "not-a-signature", secret), false);
-  assert.equal(validSignature(body, null, secret), false);
-  assert.equal(validSignature(body, signature, ""), false);
-});
 test("redirects remain on this application", () => {
-  assert.equal(safeReturn("//attacker.example"), "/dashboard");
-  assert.equal(safeReturn("https://attacker.example"), "/dashboard");
-  assert.equal(safeReturn("/\\attacker.example"), "/dashboard");
+  assert.equal(safeReturn("//attacker.example"), "/portal");
+  assert.equal(safeReturn("https://attacker.example"), "/portal");
+  assert.equal(safeReturn("/\\attacker.example"), "/portal");
   assert.equal(safeReturn("/marketplace/jobs"), "/marketplace/jobs");
-});
-test("prices are integer minor units defined on the server", () => {
-  assert.equal(checkoutProducts.professional.amount, 9900);
-  for (const product of Object.values(checkoutProducts))
-    assert.ok(Number.isInteger(product.amount) && product.amount > 0);
 });

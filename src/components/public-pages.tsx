@@ -13,20 +13,10 @@ import {
   AccordionSummary,
   AccordionDetails,
   TextField,
-  ToggleButtonGroup,
-  ToggleButton,
-  Alert,
 } from "@mui/material";
 import Close from "@mui/icons-material/Close";
 import ExpandMore from "@mui/icons-material/ExpandMore";
-import {
-  services,
-  photo,
-  seedListings,
-  plans,
-  money,
-  articles,
-} from "@/lib/catalog";
+import { services, photo, seedListings, articles } from "@/lib/catalog";
 import { ServiceCards, ListingCard } from "./cards";
 import { Cta } from "./home";
 import { Icon } from "./icon";
@@ -314,7 +304,7 @@ const faqs = [
   [
     "Account",
     "How do I create an account?",
-    "Choose Get Started, select Individual or Business, and enter your name, email and a password. You can complete your profile after signing in.",
+    "Open the advertiser portal, choose Create account, select Individual or Business, and enter your name, email and a password. You can complete your profile after signing in.",
   ],
   [
     "Marketplace",
@@ -327,9 +317,9 @@ const faqs = [
     "Listings marked Demo are sample content. Their prices, providers and availability are illustrative. Enquiries are stored locally in this preview and are not sent to external providers.",
   ],
   [
-    "Payments",
-    "How do payments work?",
-    "Checkout uses a server-created transaction. In test mode, no money changes hands. Once configured, Paystack processes payments and Solid Connect verifies the result on the server.",
+    "Customers",
+    "Do I need an account to buy or request a service?",
+    "No. Browse products and services, then send your contact details and requirements. Solid Connect admin handles the conversation and coordinates the next steps. Online payments and subscriptions are currently unavailable.",
   ],
   [
     "Logistics",
@@ -339,7 +329,7 @@ const faqs = [
   [
     "Support",
     "How can I follow up on a request?",
-    "Sign in and open My Requests. Your conversation and updates are available in Messages.",
+    "Keep your request reference. Solid Connect admin follows up using the contact details you supplied. Advertisers can also follow their own requests in the portal.",
   ],
   [
     "Properties",
@@ -405,88 +395,6 @@ export function Faq() {
               <LinkButton href="/contact">Contact us</LinkButton>
             </div>
           )}
-        </div>
-      </section>
-    </>
-  );
-}
-export function Pricing() {
-  const [cycle, setCycle] = useState("monthly");
-  return (
-    <>
-      <PageHero
-        title="Make room for what’s next."
-        description="Start with the connections you need today. Grow into the possibilities ahead."
-        eyebrow="Plans & pricing"
-      />
-      <section className="section how-section">
-        <div className="container">
-          <Alert severity="info" sx={{ mb: 4 }}>
-            Illustrative demo plans. Prices and included benefits need business
-            approval before commercial launch.
-          </Alert>
-          <div className="toggle-row">
-            <ToggleButtonGroup
-              value={cycle}
-              exclusive
-              onChange={(_, v) => v && setCycle(v)}
-              aria-label="Billing period"
-            >
-              <ToggleButton value="monthly">Monthly</ToggleButton>
-              <ToggleButton value="yearly">Yearly</ToggleButton>
-            </ToggleButtonGroup>
-          </div>
-          <div className="pricing-grid">
-            {plans.map((p, i) => (
-              <div
-                className={`price-card ${i === 1 ? "recommended" : ""}`}
-                key={p.id}
-              >
-                {i === 1 && (
-                  <span className="recommended-label">
-                    For growing businesses
-                  </span>
-                )}
-                <h2>{p.name}</h2>
-                <p>{p.description}</p>
-                <div className="price-number">
-                  {i === 2
-                    ? "Let’s talk"
-                    : money(cycle === "monthly" ? p.monthly : p.yearly)}
-                  {i !== 2 && (
-                    <small> / {cycle === "monthly" ? "month" : "year"}</small>
-                  )}
-                </div>
-                <LinkButton
-                  fullWidth
-                  variant={i === 1 ? "contained" : "outlined"}
-                  color={i === 1 ? "secondary" : "primary"}
-
-                  href={
-                    i === 0
-                      ? "/register"
-                      : i === 2 || cycle === "yearly"
-                        ? "/contact"
-                        : "/checkout?product=professional"
-                  }
-                >
-                  {i === 0
-                    ? "Get started"
-                    : i === 2 || cycle === "yearly"
-                      ? "Talk to us"
-                      : "Choose Professional"}
-                </LinkButton>
-                <ul>
-                  {p.features.map((f) => (
-                    <li key={f}>
-                      <Icon name="check" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
     </>
@@ -572,11 +480,11 @@ export function Legal({ kind }: { kind: string }) {
         </h2>
         <p>
           {kind === "privacy"
-            ? "Your account information, listings, requests and conversations are stored to provide the platform. Requests may be shared with the relevant listing owner. Passwords are hashed; payment card details are handled by the payment provider and are not stored here."
+            ? "Your account information, listings, requests and conversations are stored to provide the platform. Customer requests and conversations are handled by Solid Connect admin. Passwords are hashed. Online payments are currently unavailable."
             : kind === "cookies"
               ? "The application uses an essential HttpOnly session cookie to keep you signed in. This preview does not add advertising or analytics cookies. Listing drafts may be saved in your browser when you choose Save draft."
               : kind === "refunds"
-                ? "Demo payments do not transfer money and do not require a refund. For live transactions, cancellation and refund eligibility must be agreed with the provider and reviewed under the applicable approved policy."
+                ? "Online payments and subscriptions are currently unavailable. Contact Solid Connect admin about cancellations or changes to an enquiry."
                 : "Use accurate information and respect other members. Listings are subject to review. Do not submit unlawful, misleading, abusive or infringing content. Demo opportunities are illustrative and do not represent a commercial offer."}
         </p>
         <h2>Questions and requests</h2>

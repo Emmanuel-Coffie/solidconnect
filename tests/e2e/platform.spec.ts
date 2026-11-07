@@ -1,321 +1,285 @@
-import { test, expect } from "@playwright/test";
-const base = "http://127.0.0.1:3001";
-test("public pages, search, empty results, tracking and mobile navigation", async ({
-  page,
-}) => {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/");
-  await expect(
-    page.getByRole("heading", { name: /People. Businesses./ }),
-  ).toBeVisible();
-  await page.getByRole("link", { name: "Explore Our Services" }).click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Seven ways to create stronger connections.",
-    }),
-  ).toBeVisible();
-  await page.goto("/marketplace");
-  await page.getByLabel("What are you looking for?").fill("Frontend");
-  await page.getByRole("button", { name: "Search", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Frontend Developer" }),
-  ).toBeVisible();
-  await page.getByLabel("What are you looking for?").fill("no-results-zzzzz");
-  await page.getByRole("button", { name: "Search", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "No matches just yet." }),
-  ).toBeVisible();
-  await page.goto("/track");
-  await page.getByRole("button", { name: "SC-DEMO-2026" }).click();
-  await expect(page.getByText("Rotterdam, Netherlands")).toBeVisible();
-  await page.getByLabel("Tracking number", { exact: true }).fill("INVALID");
-  await page
-    .getByRole("button", { name: "Track shipment", exact: true })
-    .click();
-  await expect(page.getByRole("main").getByRole("alert")).toContainText(
-    "No shipment found",
+import { test, expect, type APIRequestContext } from "@playwright/test";
+const origin = "http://127.0.0.1:3001";
+const post = (request: APIRequestContext, action: string, data: object = {}) =>
+  request.post("/api/platform", {
+    headers: { origin },
+    data: { action, ...data },
+  });
+const enquiry = {
+  kind: "Products enquiry",
+  name: "Guest Customer",
+  email: "guest@example.com",
+  phone: "+233200000000",
+  subject: "Guest purchase enquiry",
+  message:
+    "Please confirm availability and coordinate this purchase through admin.",
+  listingId: "modern-villa",
+};
+
+test("guest enquiry requires no account", async ({ page }) => {
+  await page.goto("/marketplace/modern-villa");
+  await page.getByRole("button", { name: "Schedule a viewing" }).click();
+  await page.getByLabel("Full name", { exact: true }).fill(enquiry.name);
+  await page.getByLabel("Email address", { exact: true }).fill(enquiry.email);
+  await page.getByLabel("Tell us what you need").fill(enquiry.message);
+  await page.getByRole("button", { name: "Send request", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Request received");
+  await expect(page.getByRole("alert")).toContainText(
+    "admin team will contact you",
   );
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
-  await page.getByRole("button", { name: "Open navigation" }).click();
-  await expect(
-    page.getByRole("link", { name: "Track a shipment", exact: true }).last(),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Close navigation" }).click();
   expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-  ).toBe(true);
-  await page.screenshot({ path: "docs/home-mobile.png", fullPage: true });
-  expect(errors).toEqual([]);
+    (await (await page.request.get("/api/platform?action=session")).json())
+      .user,
+  ).toBeNull();
 });
-test("account, listing, enquiry, messaging, favourites, payments and authorization", async ({
+
+test("logistics offers rentals and rejects invalid enquiries", async ({
   page,
 }) => {
-  const email = `qa-${Date.now()}@example.com`;
-  await page.goto("/register");
-  await page.getByLabel("Full name", { exact: true }).fill("QA Solid Connect");
-  await page.getByLabel("Email address", { exact: true }).fill(email);
+  await page.goto("/services/logistics");
   await page
-    .getByLabel("Password", { exact: true })
-    .fill("Test-account-password-2026");
-  await page
-    .getByRole("button", { name: "Create account", exact: true })
+    .getByRole("button", { name: "Request a quote", exact: true })
+    .first()
     .click();
-  await expect(page).toHaveURL(/dashboard$/);
-  await expect(
-    page.getByRole("heading", { name: /Welcome back/ }),
-  ).toBeVisible();
-  const post = (action: string, data: object = {}) =>
-    page.request.post("/api/platform", {
-      headers: { origin: base },
-      data: { action, ...data },
-    });
-  expect((await page.request.get("/api/platform?action=admin")).status()).toBe(
-    403,
-  );
+  await page.getByLabel("Logistics service").click();
+  await page.getByRole("option", { name: "Car rental", exact: true }).click();
+  await page.getByLabel("Full name", { exact: true }).fill("Rental Customer");
+  await page
+    .getByLabel("Email address", { exact: true })
+    .fill("rental@example.com");
+  await page
+    .getByLabel("Tell us what you need")
+    .fill("I need a car and driver for three days in Accra.");
+  await page.getByRole("button", { name: "Send request", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Request received");
+  expect(
+    (
+      await post(page.request, "request", { ...enquiry, email: "invalid" })
+    ).status(),
+  ).toBe(400);
   expect(
     (
       await page.request.post("/api/platform", {
         headers: { origin: "https://attacker.example" },
-        data: { action: "save", listingId: "modern-villa" },
+        data: { action: "request", ...enquiry },
       })
     ).status(),
   ).toBe(403);
-  await page.goto("/dashboard/listings/new");
-  await page.getByLabel("Listing title").fill("QA Operations Coordinator");
-  await page.getByLabel("Location", { exact: true }).fill("Accra, Ghana");
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page
-    .getByLabel("Description", { exact: true })
-    .fill(
-      "Coordinate logistics operations and keep our growing business connected with customers.",
-    );
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Submit for review" }).click();
-  await expect(page).toHaveURL(/dashboard\/listings$/);
-  await expect(
-    page.getByRole("heading", { name: "QA Operations Coordinator" }),
-  ).toBeVisible();
-  const application = await post("request", {
-    kind: "Job application",
-    name: "QA Solid Connect",
-    email,
-    subject: "Frontend Developer",
-    message: "I would like to apply with my React and TypeScript experience.",
-    listingId: "frontend-developer",
-  });
-  expect(application.ok()).toBe(true);
-  expect(
-    (
-      await post("request", {
-        kind: "Job application",
-        name: "QA Solid Connect",
-        email,
-        subject: "Frontend Developer",
-        message: "A duplicate application should be rejected.",
-        listingId: "frontend-developer",
-      })
-    ).status(),
-  ).toBe(409);
-  const entry = (await application.json()).entry;
-  expect(
-    (
-      await post("message", {
-        conversationId: entry.id,
-        text: "Thank you for reviewing my application.",
-      })
-    ).ok(),
-  ).toBe(true);
-  expect(
-    (
-      await post("message", { conversationId: "not-mine", text: "Forbidden" })
-    ).status(),
-  ).toBe(403);
-  for (const kind of [
-    "Artisans",
-    "Property viewing",
-    "Logistics",
-    "Distribution",
-    "Sales & Marketing",
-    "Import & Export",
-  ]) {
-    const response = await post("request", {
-      kind,
-      name: "QA Solid Connect",
-      email,
-      subject: `QA ${kind} request`,
-      message:
-        "Please help me with this service request and provide a quotation.",
-      details: { Origin: "Tema", Destination: "Kumasi" },
-    });
-    expect(response.ok()).toBe(true);
-  }
-  expect((await post("save", { listingId: "modern-villa" })).ok()).toBe(true);
-  await page.goto("/dashboard/saved");
-  await expect(
-    page.getByRole("heading", { name: "A new perspective on city living" }),
-  ).toBeVisible();
-  await page.goto("/dashboard/messages");
-  await expect(
-    page.getByText("Thank you for reviewing my application."),
-  ).toBeVisible();
-  await page.goto("/checkout?product=professional");
-  await page.getByLabel("Billing name").fill("QA Solid Connect");
-  await page.getByRole("button", { name: "Continue to payment" }).click();
-  await expect(
-    page.getByRole("button", { name: "Simulate successful payment" }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Simulate successful payment" })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Test payment successful" }),
-  ).toBeVisible();
-  const dashboard = await (
-    await page.request.get("/api/platform?action=dashboard")
-  ).json();
-  expect(dashboard.payments[0].status).toBe("success");
-  expect(dashboard.payments[0].amount).toBe(9900);
-  await page.goto("/dashboard");
-  await expect(
-    page.getByRole("heading", { name: "Recent activity" }),
-  ).toBeVisible();
-  await page.screenshot({ path: "docs/dashboard-desktop.png", fullPage: true });
-  await post("logout");
-  expect(
-    (await page.request.get("/api/platform?action=dashboard")).status(),
-  ).toBe(401);
 });
 
-test("administrator moderation, upload rejection, payment failure and account isolation", async ({
-  page,
-  browser,
-}) => {
-  test.skip(!process.env.ADMIN_PASSWORD, "Local admin seed required.");
-  const login = await page.request.post("/api/platform", {
-    headers: { origin: base },
-    data: {
-      action: "login",
-      email: process.env.ADMIN_EMAIL,
-      password: process.env.ADMIN_PASSWORD,
-    },
-  });
-  expect(login.ok()).toBe(true);
-  const data = await (
-    await page.request.get("/api/platform?action=admin")
-  ).json();
-  const listing = data.listings.find(
-    (l: { title: string; status: string }) =>
-      l.title === "QA Operations Coordinator" && l.status === "pending",
-  );
-  expect(listing).toBeTruthy();
-  await page.goto("/admin");
+test("standalone advertiser portal and disabled payments", async ({ page }) => {
+  await page.goto("/login?next=%2Fportal%2Flistings");
+  await expect(page).toHaveURL(/\/portal\/login\?next=/);
+  await page.goto("/portal/register");
   await expect(
-    page.getByRole("heading", { name: "Keep the network moving." }),
-  ).toBeVisible();
-  const moderate = await page.request.post("/api/platform", {
-    headers: { origin: base },
-    data: {
-      action: "moderate",
-      id: listing.id,
-      status: "published",
-      featured: false,
-      verified: false,
-    },
-  });
-  expect(moderate.ok()).toBe(true);
-  const publicListings = await (
-    await page.request.get("/api/platform?action=listings")
-  ).json();
-  expect(
-    publicListings.listings.some((l: { id: string }) => l.id === listing.id),
-  ).toBe(true);
-  const context = await browser.newContext({ baseURL: base });
-  const other = await context.newPage();
-  const email = `isolation-${Date.now()}@example.com`;
-  await other.request.post("/api/platform", {
-    headers: { origin: base },
-    data: {
-      action: "register",
-      name: "QA Isolated User",
-      email,
-      password: "Another-test-password-2026",
-      accountType: "Individual",
-    },
-  });
-  const forbidden = await other.request.post("/api/platform", {
-    headers: { origin: base },
-    data: { action: "listing-status", id: listing.id },
-  });
-  expect(forbidden.status()).toBe(404);
-  const upload = await other.request.post("/api/upload", {
-    headers: { origin: base },
-    multipart: {
-      file: {
-        name: "fake.png",
-        mimeType: "image/png",
-        buffer: Buffer.from("not an image"),
-      },
-    },
-  });
-  expect(upload.status()).toBe(400);
-  const initiated = await (
-    await other.request.post("/api/platform", {
-      headers: { origin: base },
-      data: { action: "checkout", product: "listing", amount: 1 },
-    })
-  ).json();
-  expect(initiated.payment.amount).toBe(4900);
-  const settled = await other.request.post("/api/platform", {
-    headers: { origin: base },
-    data: {
-      action: "mock-settle",
-      reference: initiated.payment.reference,
-      status: "failed",
-    },
-  });
-  expect(settled.ok()).toBe(true);
-  await other.goto(`/payment/success?reference=${initiated.payment.reference}`);
-  await expect(
-    other.getByRole("heading", { name: "Payment was not completed" }),
-  ).toBeVisible();
-  const isolated = await page.request.get(
-    `/api/platform?action=payment&reference=${initiated.payment.reference}`,
-  );
-  expect(isolated.status()).toBe(404);
-  const replay = await (
-    await other.request.post("/api/platform", {
-      headers: { origin: base },
-      data: {
-        action: "mock-settle",
-        reference: initiated.payment.reference,
-        status: "success",
-      },
-    })
-  ).json();
-  expect(replay.payment.status).toBe("failed");
-  await page.goto("/dashboard/profile");
-  await expect(
-    page.getByRole("heading", { name: "Your profile" }),
-  ).toBeVisible();
+    page.getByRole("navigation", { name: "Main navigation" }),
+  ).toHaveCount(0);
   await page
     .getByLabel("Full name", { exact: true })
-    .fill("Solid Connect Admin");
-  await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByText("Profile updated.")).toBeVisible();
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/dashboard");
+    .fill("Service Advertiser");
+  await page
+    .getByLabel("Email address", { exact: true })
+    .fill(`advertiser-${Date.now()}@example.com`);
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("A-long-test-password-2026");
+  await page
+    .getByRole("button", { name: "Create account", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/portal$/);
+  const listing = await post(page.request, "listing", {
+    title: "Professional cleaning service",
+    category: "Services",
+    location: "Accra",
+    price: 0,
+    unit: "Price on request",
+    description:
+      "Professional home and office cleaning. Contact admin to coordinate availability.",
+    image: "photo-1573167101669-476636b96cea",
+  });
+  expect(listing.ok()).toBe(true);
+  expect((await listing.json()).listing.status).toBe("pending");
+  await page.goto("/portal/listings");
   await expect(
-    page.getByRole("heading", { name: "Recent activity" }),
+    page.getByRole("heading", { name: "Professional cleaning service" }),
   ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({ path: "docs/dashboard-mobile.png", fullPage: true });
-  await context.close();
+  expect(
+    (
+      await post(page.request, "checkout", { product: "professional" })
+    ).status(),
+  ).toBe(410);
+  expect(
+    (
+      await post(page.request, "mock-settle", {
+        reference: "anything",
+        status: "success",
+      })
+    ).status(),
+  ).toBe(410);
+  expect(
+    (await page.request.post("/api/payments/webhook", { data: {} })).status(),
+  ).toBe(410);
+  await page
+    .getByRole("button", { name: "Open workspace navigation", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page).toHaveURL(/\/portal\/login$/);
+  await page.goto("/pricing");
+  await expect(page).toHaveURL(/\/contact$/);
+});
+
+test("admin owns guest requests; advertisers cannot bypass admin", async ({
+  browser,
+}) => {
+  test.skip(!process.env.ADMIN_PASSWORD, "Admin seed required");
+  const admin = await browser.newContext({ baseURL: origin });
+  const owner = await browser.newContext({ baseURL: origin });
+  const guest = await browser.newContext({ baseURL: origin });
+  try {
+    expect(
+      (
+        await post(admin.request, "login", {
+          email: process.env.ADMIN_EMAIL,
+          password: process.env.ADMIN_PASSWORD,
+        })
+      ).ok(),
+    ).toBe(true);
+    await post(owner.request, "register", {
+      name: "Listing Owner",
+      email: `owner-${Date.now()}@example.com`,
+      password: "A-long-test-password-2026",
+      accountType: "Business",
+    });
+    const item = (
+      await (
+        await post(owner.request, "listing", {
+          title: "Home moving van hire",
+          category: "Logistics",
+          location: "Accra",
+          price: 0,
+          unit: "Price on request",
+          description:
+            "A moving van and driver for home relocations, arranged through Solid Connect admin.",
+          image: "photo-1578575437130-527eed3abbec",
+        })
+      ).json()
+    ).listing;
+    expect(
+      (
+        await post(admin.request, "moderate", {
+          id: item.id,
+          status: "published",
+          featured: false,
+          verified: false,
+        })
+      ).ok(),
+    ).toBe(true);
+    const entry = (
+      await (
+        await post(guest.request, "request", {
+          ...enquiry,
+          kind: "Logistics",
+          listingId: item.id,
+          details: {
+            "Service required": "Home move / moving out",
+            Origin: "Accra",
+            Destination: "Tema",
+          },
+        })
+      ).json()
+    ).entry;
+    const own = await (
+      await owner.request.get("/api/platform?action=dashboard")
+    ).json();
+    expect(own.requests.some((r: { id: string }) => r.id === entry.id)).toBe(
+      false,
+    );
+    expect(
+      (
+        await post(owner.request, "message", {
+          conversationId: entry.id,
+          text: "Cannot bypass admin",
+        })
+      ).status(),
+    ).toBe(403);
+    expect(
+      (
+        await post(owner.request, "request-status", {
+          id: entry.id,
+          status: "Completed",
+        })
+      ).status(),
+    ).toBe(403);
+    const inbox = await (
+      await admin.request.get("/api/platform?action=admin")
+    ).json();
+    expect(
+      inbox.requests.find((r: { id: string }) => r.id === entry.id).phone,
+    ).toBe(enquiry.phone);
+    const page = await admin.newPage();
+    await page.goto("/portal/admin");
+    await expect(
+      page.getByRole("heading", { name: "Every enquiry. One admin team." }),
+    ).toBeVisible();
+    await expect(page.getByText(entry.id, { exact: true })).toBeVisible();
+    expect(
+      (
+        await post(admin.request, "request-status", {
+          id: entry.id,
+          status: "In review",
+        })
+      ).ok(),
+    ).toBe(true);
+    // A signed-in customer still talks exclusively to admin.
+    await post(guest.request, "register", {
+      name: "Customer Account",
+      email: `customer-${Date.now()}@example.com`,
+      password: "A-long-test-password-2026",
+      accountType: "Individual",
+    });
+    const conversation = (
+      await (
+        await post(guest.request, "request", {
+          ...enquiry,
+          listingId: item.id,
+          subject: "Customer follow-up",
+        })
+      ).json()
+    ).entry;
+    expect(
+      (
+        await post(admin.request, "message", {
+          conversationId: conversation.id,
+          text: "Admin is coordinating your move.",
+        })
+      ).ok(),
+    ).toBe(true);
+    const customer = await (
+      await guest.request.get("/api/platform?action=dashboard")
+    ).json();
+    expect(
+      customer.messages.some(
+        (message: { text: string }) =>
+          message.text === "Admin is coordinating your move.",
+      ),
+    ).toBe(true);
+    expect(
+      (
+        await post(owner.request, "message", {
+          conversationId: conversation.id,
+          text: "Advertiser must not enter this conversation.",
+        })
+      ).status(),
+    ).toBe(403);
+  } finally {
+    await admin.close();
+    await owner.close();
+    await guest.close();
+  }
 });

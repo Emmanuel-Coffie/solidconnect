@@ -18,7 +18,7 @@ import {
   listingSchema,
   requestSchema,
 } from "@/lib/validation";
-import { checkoutProducts, provider, verifyAndSave } from "@/lib/payments";
+
 import { sendEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
@@ -56,7 +56,13 @@ export async function GET(req: Request) {
 
     if (action === "listings")
       return NextResponse.json({
-        listings: state.listings.filter((x) => x.status === "published"),
+        listings: state.listings.filter(
+          (x) =>
+            x.status === "published" &&
+            (process.env.NODE_ENV !== "production" ||
+              process.env.ALLOW_LOCAL_DEMO === "true" ||
+              !x.demo),
+        ),
       });
 
     if (action === "track") {
@@ -94,17 +100,8 @@ export async function GET(req: Request) {
 
     if (!user) throw new ApiError(401, "Sign in to continue.");
 
-    if (action === "payment") {
-      const payment = state.payments.find(
-        (x) => x.reference === q.get("reference") && x.userId === user.id,
-      );
-
-      if (!payment) throw new ApiError(404, "Payment not found.");
-
-      return NextResponse.json({
-        payment: await verifyAndSave(payment),
-      });
-    }
+    if (action === "payment")
+      throw new ApiError(410, "Online payments are unavailable.");
 
     if (action === "admin") {
       if (user.role !== "ADMIN")
@@ -114,23 +111,16 @@ export async function GET(req: Request) {
         users: state.users.map(publicUser),
         listings: state.listings,
         requests: state.requests,
-        payments: state.payments,
+        messages: state.messages,
       });
     }
 
-    const ownListings = state.listings.filter(
-      (x) => x.ownerId === user.id,
-    );
+    const ownListings = state.listings.filter((x) => x.ownerId === user.id);
 
-    const requests = state.requests.filter(
-      (x) =>
-        x.userId === user.id ||
-        ownListings.some((l) => l.id === x.listingId),
-    );
+    // Customer enquiries belong exclusively to the requester and admin.
+    const requests = state.requests.filter((x) => x.userId === user.id);
 
-    const conversations = new Set(
-      requests.map((x) => x.id),
-    );
+    const conversations = new Set(requests.map((x) => x.id));
 
     return NextResponse.json({
       user: publicUser(user),
@@ -138,20 +128,13 @@ export async function GET(req: Request) {
       requests,
       saved: state.listings.filter((x) =>
         state.favourites.some(
-          (f) =>
-            f.userId === user.id &&
-            f.listingId === x.id,
+          (f) => f.userId === user.id && f.listingId === x.id,
         ),
       ),
       messages: state.messages.filter((x) =>
         conversations.has(x.conversationId),
       ),
-      payments: state.payments.filter(
-        (x) => x.userId === user.id,
-      ),
-      notifications: state.notifications.filter(
-        (x) => x.userId === user.id,
-      ),
+      notifications: state.notifications.filter((x) => x.userId === user.id),
     });
   } catch (e) {
     return errorResponse(e);
@@ -167,24 +150,15 @@ export async function POST(req: Request) {
 
     rateLimit(
       `action:${action}:${req.headers.get("x-forwarded-for") ?? "local"}`,
-      action === "login" || action === "register"
-        ? 30
-        : 120,
+      action === "login" || action === "register" ? 30 : 120,
     );
 
     if (action === "register") {
       const input = registerSchema.parse(body);
-      const passwordHash = await hash(
-        input.password,
-        12,
-      );
+      const passwordHash = await hash(input.password, 12);
 
       const user = await mutate((s) => {
-        if (
-          s.users.some(
-            (x) => x.email === input.email,
-          )
-        )
+        if (s.users.some((x) => x.email === input.email))
           throw new ApiError(
             409,
             "An account already uses this email. Try signing in.",
@@ -220,19 +194,11 @@ export async function POST(req: Request) {
     if (action === "login") {
       const input = loginSchema.parse(body);
 
-      const user = (
-        await readStore()
-      ).users.find(
+      const user = (await readStore()).users.find(
         (x) => x.email === input.email,
       );
 
-      if (
-        !user ||
-        !(await compare(
-          input.password,
-          user.passwordHash,
-        ))
-      )
+      if (!user || !(await compare(input.password, user.passwordHash)))
         throw new ApiError(
           401,
           "Email or password is incorrect. Please try again.",
@@ -256,31 +222,20 @@ export async function POST(req: Request) {
     if (action === "forgot") {
       const email = z.email().parse(body.email);
 
-      const user = (
-        await readStore()
-      ).users.find(
+      const user = (await readStore()).users.find(
         (x) => x.email === email.toLowerCase(),
       );
 
-      if (
-        user &&
-        process.env.RESEND_API_KEY
-      ) {
-        const token = randomBytes(32).toString(
-          "hex",
-        );
+      if (user && process.env.RESEND_API_KEY) {
+        const token = randomBytes(32).toString("hex");
 
         await mutate((s) => {
           s.tokens = s.tokens.filter(
-            (x) =>
-              x.userId !== user.id ||
-              x.kind !== "reset",
+            (x) => x.userId !== user.id || x.kind !== "reset",
           );
 
           s.tokens.push({
-            hash: createHash("sha256")
-              .update(token)
-              .digest("hex"),
+            hash: createHash("sha256").update(token).digest("hex"),
             userId: user.id,
             kind: "reset",
             expires: Date.now() + 3600000,
@@ -290,7 +245,7 @@ export async function POST(req: Request) {
         await sendEmail(
           email,
           "Reset your Solid Connect password",
-          `${process.env.NEXTAUTH_URL}/reset-password?token=${token}`,
+          `${process.env.PORTAL_URL ?? process.env.NEXTAUTH_URL}/portal/reset-password?token=${token}`,
         );
       }
 
@@ -305,25 +260,16 @@ export async function POST(req: Request) {
       const input = z
         .object({
           token: z.string().min(32),
-          password: z
-            .string()
-            .min(10)
-            .max(100),
+          password: z.string().min(10).max(100),
         })
         .parse(body);
 
-      const passwordHash = await hash(
-        input.password,
-        12,
-      );
+      const passwordHash = await hash(input.password, 12);
 
       await mutate((s) => {
         const token = s.tokens.find(
           (x) =>
-            x.hash ===
-              createHash("sha256")
-                .update(input.token)
-                .digest("hex") &&
+            x.hash === createHash("sha256").update(input.token).digest("hex") &&
             x.kind === "reset" &&
             x.expires > Date.now(),
         );
@@ -334,17 +280,12 @@ export async function POST(req: Request) {
             "This reset link has expired or is invalid. Request a new link.",
           );
 
-        const user = s.users.find(
-          (x) => x.id === token.userId,
-        )!;
+        const user = s.users.find((x) => x.id === token.userId)!;
 
         user.passwordHash = passwordHash;
-        user.sessionVersion =
-          (user.sessionVersion ?? 0) + 1;
+        user.sessionVersion = (user.sessionVersion ?? 0) + 1;
 
-        s.tokens = s.tokens.filter(
-          (x) => x !== token,
-        );
+        s.tokens = s.tokens.filter((x) => x !== token);
       });
 
       return NextResponse.json({
@@ -352,39 +293,22 @@ export async function POST(req: Request) {
       });
     }
 
-    if (
-      action === "request" ||
-      action === "contact"
-    ) {
+    if (action === "request" || action === "contact") {
       const input = requestSchema.parse(body);
       const user = await currentUser();
-
-      if (
-        action === "request" &&
-        !user
-      )
-        throw new ApiError(
-          401,
-          "Sign in to send your request.",
-        );
 
       const entry = await mutate((s) => {
         if (
           input.listingId &&
           !s.listings.some(
-            (x) =>
-              x.id === input.listingId &&
-              x.status === "published",
+            (x) => x.id === input.listingId && x.status === "published",
           )
         )
-          throw new ApiError(
-            404,
-            "This listing is no longer available.",
-          );
+          throw new ApiError(404, "This listing is no longer available.");
 
         if (
-          input.kind ===
-            "Job application" &&
+          !!user &&
+          input.kind === "Job application" &&
           s.requests.some(
             (x) =>
               x.kind === input.kind &&
@@ -402,8 +326,7 @@ export async function POST(req: Request) {
           id: newId(),
           userId: user?.id ?? "",
           status: "Submitted",
-          createdAt:
-            new Date().toISOString(),
+          createdAt: new Date().toISOString(),
         };
 
         s.requests.push(item);
@@ -423,12 +346,16 @@ export async function POST(req: Request) {
       await sendEmail(
         input.email,
         "Your request has been received",
-        `Reference: ${entry.id}\n${input.subject}\nYou can follow up from your Solid Connect dashboard.`,
+        `Reference: ${entry.id}\n${input.subject}\nOur admin team will contact you using the details you supplied. No account is needed.`,
       ).catch(() => {});
 
-      return NextResponse.json({
-        entry,
-      });
+      if (process.env.ADMIN_EMAIL)
+        await sendEmail(
+          process.env.ADMIN_EMAIL,
+          `New request: ${entry.id}`,
+          `A new ${input.kind} request is waiting in the admin portal. Reference: ${entry.id}`,
+        ).catch(() => {});
+      return NextResponse.json({ entry: { id: entry.id } });
     }
 
     /*
@@ -446,16 +373,10 @@ export async function POST(req: Request) {
      * - a logged-out session
      */
     if (action === "verify-email") {
-      const token = z
-        .string()
-        .min(32)
-        .max(128)
-        .parse(body.token);
+      const token = z.string().min(32).max(128).parse(body.token);
 
       await mutate((s) => {
-        const tokenHash = createHash("sha256")
-          .update(token)
-          .digest("hex");
+        const tokenHash = createHash("sha256").update(token).digest("hex");
 
         const record = s.tokens.find(
           (t) =>
@@ -470,9 +391,7 @@ export async function POST(req: Request) {
             "This verification link is invalid or has expired. Request a new verification email.",
           );
 
-        const account = s.users.find(
-          (u) => u.id === record.userId,
-        );
+        const account = s.users.find((u) => u.id === record.userId);
 
         if (!account)
           throw new ApiError(
@@ -486,14 +405,11 @@ export async function POST(req: Request) {
          * The token is deleted after successful use,
          * making it a one-time verification link.
          */
-        s.tokens = s.tokens.filter(
-          (t) => t !== record,
-        );
+        s.tokens = s.tokens.filter((t) => t !== record);
       });
 
       return NextResponse.json({
-        message:
-          "Your email is verified.",
+        message: "Your email is verified.",
       });
     }
 
@@ -506,8 +422,7 @@ export async function POST(req: Request) {
     if (action === "send-verification") {
       if (user.emailVerified)
         return NextResponse.json({
-          message:
-            "Your email is already verified.",
+          message: "Your email is already verified.",
         });
 
       if (!process.env.RESEND_API_KEY)
@@ -516,9 +431,7 @@ export async function POST(req: Request) {
           "Verification email is not configured in this preview.",
         );
 
-      const token = randomBytes(32).toString(
-        "hex",
-      );
+      const token = randomBytes(32).toString("hex");
 
       await mutate((s) => {
         /*
@@ -526,42 +439,32 @@ export async function POST(req: Request) {
          * links for this user.
          */
         s.tokens = s.tokens.filter(
-          (t) =>
-            t.userId !== user.id ||
-            t.kind !== "verify",
+          (t) => t.userId !== user.id || t.kind !== "verify",
         );
 
         s.tokens.push({
-          hash: createHash("sha256")
-            .update(token)
-            .digest("hex"),
+          hash: createHash("sha256").update(token).digest("hex"),
           userId: user.id,
           kind: "verify",
-          expires:
-            Date.now() + 86400000,
+          expires: Date.now() + 86400000,
         });
       });
 
       await sendEmail(
         user.email,
         "Verify your Solid Connect email",
-        `${process.env.NEXTAUTH_URL}/verify-email?token=${token}`,
+        `${process.env.PORTAL_URL ?? process.env.NEXTAUTH_URL}/portal/verify-email?token=${token}`,
       );
 
       return NextResponse.json({
-        message:
-          "Verification link sent. Check your inbox.",
+        message: "Verification link sent. Check your inbox.",
       });
     }
 
     if (action === "profile") {
       const input = z
         .object({
-          name: z
-            .string()
-            .trim()
-            .min(2)
-            .max(100),
+          name: z.string().trim().min(2).max(100),
           bio: z.string().max(1000),
           company: z.string().max(100),
           phone: z.string().max(30),
@@ -570,9 +473,7 @@ export async function POST(req: Request) {
 
       await mutate((s) =>
         Object.assign(
-          s.users.find(
-            (x) => x.id === user.id,
-          )!,
+          s.users.find((x) => x.id === user.id)!,
           input,
         ),
       );
@@ -583,35 +484,18 @@ export async function POST(req: Request) {
     }
 
     if (action === "save") {
-      const id = z.string().parse(
-        body.listingId,
-      );
+      const id = z.string().parse(body.listingId);
 
       const saved = await mutate((s) => {
-        if (
-          !s.listings.some(
-            (x) =>
-              x.id === id &&
-              x.status === "published",
-          )
-        )
-          throw new ApiError(
-            404,
-            "Listing unavailable.",
-          );
+        if (!s.listings.some((x) => x.id === id && x.status === "published"))
+          throw new ApiError(404, "Listing unavailable.");
 
-        const existing =
-          s.favourites.find(
-            (x) =>
-              x.userId === user.id &&
-              x.listingId === id,
-          );
+        const existing = s.favourites.find(
+          (x) => x.userId === user.id && x.listingId === id,
+        );
 
         if (existing) {
-          s.favourites =
-            s.favourites.filter(
-              (x) => x !== existing,
-            );
+          s.favourites = s.favourites.filter((x) => x !== existing);
 
           return false;
         }
@@ -630,24 +514,14 @@ export async function POST(req: Request) {
     }
 
     if (action === "listing") {
-      const input = listingSchema.parse(
-        body,
-      );
+      const input = listingSchema.parse(body);
 
       const listing = await mutate((s) => {
         const existing = body.id
-          ? s.listings.find(
-              (x) =>
-                x.id === body.id &&
-                x.ownerId === user.id,
-            )
+          ? s.listings.find((x) => x.id === body.id && x.ownerId === user.id)
           : null;
 
-        if (body.id && !existing)
-          throw new ApiError(
-            404,
-            "Listing not found.",
-          );
+        if (body.id && !existing) throw new ApiError(404, "Listing not found.");
 
         if (existing) {
           Object.assign(existing, input, {
@@ -661,13 +535,11 @@ export async function POST(req: Request) {
           ...input,
           id: newId(),
           ownerId: user.id,
-          provider:
-            user.company || user.name,
+          provider: user.company || user.name,
           verified: false,
           featured: false,
           status: "pending" as const,
-          createdAt:
-            new Date().toISOString(),
+          createdAt: new Date().toISOString(),
         };
 
         s.listings.push(item);
@@ -685,16 +557,10 @@ export async function POST(req: Request) {
 
       await mutate((s) => {
         const listing = s.listings.find(
-          (x) =>
-            x.id === id &&
-            x.ownerId === user.id,
+          (x) => x.id === id && x.ownerId === user.id,
         );
 
-        if (!listing)
-          throw new ApiError(
-            404,
-            "Listing not found.",
-          );
+        if (!listing) throw new ApiError(404, "Listing not found.");
 
         listing.status = "suspended";
       });
@@ -708,42 +574,24 @@ export async function POST(req: Request) {
       const input = z
         .object({
           conversationId: z.string(),
-          text: z
-            .string()
-            .trim()
-            .min(1)
-            .max(5000),
+          text: z.string().trim().min(1).max(5000),
         })
         .parse(body);
 
       const message = await mutate((s) => {
-        const entry = s.requests.find(
-          (x) =>
-            x.id === input.conversationId,
-        );
+        const entry = s.requests.find((x) => x.id === input.conversationId);
 
-        const owner = s.listings.find(
-          (x) =>
-            x.id === entry?.listingId,
-        )?.ownerId;
-
-        if (
-          !entry ||
-          (entry.userId !== user.id &&
-            owner !== user.id &&
-            user.role !== "ADMIN")
-        )
+        if (!entry || (entry.userId !== user.id && user.role !== "ADMIN"))
           throw new ApiError(
             403,
-            "You do not have access to this conversation.",
+            "Only the requester and Solid Connect admin can access this conversation.",
           );
 
         const msg = {
           ...input,
           id: newId(),
           userId: user.id,
-          createdAt:
-            new Date().toISOString(),
+          createdAt: new Date().toISOString(),
         };
 
         s.messages.push(msg);
@@ -772,23 +620,12 @@ export async function POST(req: Request) {
         .parse(body);
 
       await mutate((s) => {
-        const entry = s.requests.find(
-          (x) => x.id === input.id,
-        );
+        const entry = s.requests.find((x) => x.id === input.id);
 
-        const owner = s.listings.find(
-          (x) =>
-            x.id === entry?.listingId,
-        )?.ownerId;
-
-        if (
-          !entry ||
-          (owner !== user.id &&
-            user.role !== "ADMIN")
-        )
+        if (!entry || user.role !== "ADMIN")
           throw new ApiError(
             403,
-            "Only the provider can change this status.",
+            "Only Solid Connect admin can change request status.",
           );
 
         entry.status = input.status;
@@ -802,13 +639,8 @@ export async function POST(req: Request) {
     if (action === "read-notifications") {
       await mutate((s) =>
         s.notifications
-          .filter(
-            (x) =>
-              x.userId === user.id,
-          )
-          .forEach(
-            (x) => (x.read = true),
-          ),
+          .filter((x) => x.userId === user.id)
+          .forEach((x) => (x.read = true)),
       );
 
       return NextResponse.json({
@@ -816,147 +648,29 @@ export async function POST(req: Request) {
       });
     }
 
-    if (action === "checkout") {
-      if (
-        process.env.PAYMENTS_MODE ===
-          "live" &&
-        !process.env.PAYSTACK_SECRET_KEY
-      )
-        throw new ApiError(
-          503,
-          "Live payments are not configured. Please contact support.",
-        );
-
-      const productKey = z
-        .enum([
-          "professional",
-          "consultation",
-          "listing",
-        ])
-        .parse(body.product);
-
-      const product =
-        checkoutProducts[productKey];
-
-      const payment = await mutate((s) => {
-        const pending = s.payments.find(
-          (x) =>
-            x.userId === user.id &&
-            x.description ===
-              product.description &&
-            x.provider ===
-              (process.env.PAYMENTS_MODE ===
-              "live"
-                ? "paystack"
-                : "mock") &&
-            x.status === "pending",
-        );
-
-        if (pending) return pending;
-
-        const p = {
-          id: newId(),
-          userId: user.id,
-          reference: `SC-${randomBytes(
-            12,
-          ).toString("hex")}`,
-          amount: product.amount,
-          currency: "GHS",
-          status: "pending" as const,
-          provider:
-            process.env.PAYMENTS_MODE ===
-              "live" &&
-            process.env.PAYSTACK_SECRET_KEY
-              ? ("paystack" as const)
-              : ("mock" as const),
-          description:
-            product.description,
-          createdAt:
-            new Date().toISOString(),
-        };
-
-        s.payments.push(p);
-
-        return p;
-      });
-
-      return NextResponse.json({
-        ...(await provider.initialize(
-          payment,
-          user.email,
-          process.env.NEXTAUTH_URL ??
-            new URL(req.url).origin,
-        )),
-        payment,
-      });
-    }
-
-    if (action === "mock-settle") {
-      const result = await mutate((s) => {
-        const p = s.payments.find(
-          (x) =>
-            x.reference ===
-              body.reference &&
-            x.userId === user.id,
-        );
-
-        if (
-          !p ||
-          p.provider !== "mock" ||
-          process.env.PAYMENTS_MODE ===
-            "live"
-        )
-          throw new ApiError(
-            403,
-            "Test payment unavailable.",
-          );
-
-        if (p.status !== "pending")
-          return p;
-
-        p.status = z
-          .enum(["success", "failed"])
-          .parse(body.status);
-
-        return p;
-      });
-
-      return NextResponse.json({
-        payment: result,
-      });
-    }
+    if (["checkout", "mock-settle"].includes(action))
+      throw new ApiError(
+        410,
+        "Online payments and subscriptions are unavailable.",
+      );
 
     if (action === "moderate") {
       if (user.role !== "ADMIN")
-        throw new ApiError(
-          403,
-          "Administrator access is required.",
-        );
+        throw new ApiError(403, "Administrator access is required.");
 
       const input = z
         .object({
           id: z.string(),
-          status: z.enum([
-            "published",
-            "pending",
-            "rejected",
-            "suspended",
-          ]),
+          status: z.enum(["published", "pending", "rejected", "suspended"]),
           featured: z.boolean(),
           verified: z.boolean(),
         })
         .parse(body);
 
       await mutate((s) => {
-        const listing = s.listings.find(
-          (x) => x.id === input.id,
-        );
+        const listing = s.listings.find((x) => x.id === input.id);
 
-        if (!listing)
-          throw new ApiError(
-            404,
-            "Listing not found.",
-          );
+        if (!listing) throw new ApiError(404, "Listing not found.");
 
         Object.assign(listing, input);
       });
@@ -966,10 +680,7 @@ export async function POST(req: Request) {
       });
     }
 
-    throw new ApiError(
-      400,
-      "Unknown action.",
-    );
+    throw new ApiError(400, "Unknown action.");
   } catch (e) {
     return errorResponse(e);
   }

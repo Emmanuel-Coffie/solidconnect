@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { Plus_Jakarta_Sans, Outfit } from "next/font/google";
 import { Providers } from "@/components/providers";
-import { Header, Footer } from "@/components/layout";
+import { SiteShell } from "@/components/site-shell";
 import "./globals.css";
 import "./brand.css";
+import "./portal.css";
 const outfit = Outfit({
   subsets: ["latin"],
   variable: "--font-display",
@@ -39,9 +40,7 @@ export default function RootLayout({
       <body className={`${jakarta.variable} ${outfit.variable}`}>
         <AppRouterCacheProvider>
           <Providers>
-            <Header />
-            <main id="main">{children}</main>
-            <Footer />
+            <SiteShell>{children}</SiteShell>
           </Providers>
         </AppRouterCacheProvider>
       </body>

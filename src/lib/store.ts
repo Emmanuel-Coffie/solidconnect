@@ -26,6 +26,7 @@ export type Entry = {
   status: string;
   createdAt: string;
   email?: string;
+  phone?: string;
   name?: string;
   listingId?: string;
   details?: Record<string, string>;
@@ -66,7 +67,11 @@ export type State = {
 };
 const initial = (): State => ({
   users: [],
-  listings: structuredClone(seedListings),
+  listings:
+    process.env.NODE_ENV === "production" &&
+    process.env.ALLOW_LOCAL_DEMO !== "true"
+      ? []
+      : structuredClone(seedListings),
   requests: [],
   favourites: [],
   messages: [],

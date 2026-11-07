@@ -162,6 +162,25 @@ button:focus-visible {
 .skip-link:focus {
   top: 12px;
 }
+.skip-link:not(:focus) {
+  clip-path: inset(50%);
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+}
+/* Every application scroll surface inherits the same accessible baseline. */
+:root {
+  --scrollbar-thumb: #9caec4;
+  --scrollbar-track: #edf2f8;
+}
+* {scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track)}
+::-webkit-scrollbar {width: 10px; height: 10px}
+::-webkit-scrollbar-track {background: var(--scrollbar-track)}
+::-webkit-scrollbar-thumb {background: var(--scrollbar-thumb); border: 2px solid var(--scrollbar-track); border-radius: 8px}
+::-webkit-scrollbar-thumb:hover {background: #647c99}
+::-webkit-scrollbar-thumb:active {background: #456486}
+@media (forced-colors: active) {* {scrollbar-color: auto}}
 .header {
   height: 82px;
   background: rgba(255, 255, 255, 0.98);

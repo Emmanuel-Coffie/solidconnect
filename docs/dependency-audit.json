@@ -1,5 +1,10 @@
 {
-  "auditReportVersion": 2,
+  "checkedOn": "2026-11-06",
+  "command": "npm audit --omit=dev --json",
+  "versions": {
+    "next": "15.5.29",
+    "zod": "4.6.7"
+  },
   "vulnerabilities": {},
   "metadata": {
     "vulnerabilities": {
@@ -9,14 +14,6 @@
       "high": 0,
       "critical": 0,
       "total": 0
-    },
-    "dependencies": {
-      "prod": 147,
-      "dev": 322,
-      "optional": 92,
-      "peer": 0,
-      "peerOptional": 0,
-      "total": 506
     }
   }
 }
