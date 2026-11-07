@@ -1,33 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { portalDestination } from "@/lib/portal-routing";
 
 // Deploy the same application on an optional dedicated portal domain.
 // Sessions stay host-only; the portal never depends on the public site's shell.
 export function middleware(request: NextRequest) {
-  const portalHost = process.env.PORTAL_HOST?.toLowerCase();
-  const url = request.nextUrl.clone();
-  if (
-    portalHost &&
-    url.hostname.toLowerCase() === portalHost &&
-    !url.pathname.startsWith("/portal") &&
-    !url.pathname.startsWith("/api") &&
-    !url.pathname.startsWith("/_next") &&
-    !url.pathname.includes(".")
-  ) {
-    if (url.pathname === "/") url.pathname = "/portal";
-    else if (
-      [
-        "/login",
-        "/register",
-        "/forgot-password",
-        "/reset-password",
-        "/verify-email",
-        "/admin",
-      ].includes(url.pathname)
-    )
-      url.pathname = "/portal" + url.pathname;
-    else return NextResponse.next();
-    return NextResponse.redirect(url);
-  }
+  const destination = portalDestination(request.url, {
+    portalHost: process.env.PORTAL_HOST,
+    portalUrl: process.env.PORTAL_URL,
+    publicUrl: process.env.NEXTAUTH_URL,
+  });
+  if (destination) return NextResponse.redirect(destination);
   return NextResponse.next();
 }
 
