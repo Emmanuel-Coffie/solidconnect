@@ -125,6 +125,9 @@ test("standalone advertiser portal and disabled payments", async ({ page }) => {
   expect(
     (await page.request.post("/api/payments/webhook", { data: {} })).status(),
   ).toBe(410);
+  await page
+    .getByRole("button", { name: "Open workspace navigation", exact: true })
+    .click();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page).toHaveURL(/\/portal\/login$/);
   await page.goto("/pricing");

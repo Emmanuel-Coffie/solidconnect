@@ -8,7 +8,6 @@ import {
   Faq,
   Resources,
   Legal,
-  PageHero,
 } from "@/components/public-pages";
 import { Marketplace, ListingDetail } from "@/components/marketplace";
 import { AuthForm, Contact, VerifyEmail } from "@/components/forms";
@@ -37,6 +36,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function Page({ params }: Props) {
   const { path } = await params;
   const [original, ...rest] = path;
+  if (original === "portal" && ["orders", "applications"].includes(rest[0]))
+    redirect("/portal/requests");
+  if (original === "portal" && rest[0] === "settings")
+    redirect("/portal/profile");
   if (original === "dashboard")
     redirect("/portal" + (rest.length ? "/" + rest.join("/") : ""));
   // Legacy auth routes retain query strings through next.config redirects.
@@ -97,17 +100,7 @@ export default async function Page({ params }: Props) {
         <ListingDetail id={sub} />
       );
   } else if (root === "search") page = <Marketplace searchPage />;
-  else if (root === "contact")
-    page = (
-      <>
-        <PageHero
-          title="Good things start with a conversation."
-          description="Tell us about your next step. Let’s find the right connection."
-          eyebrow="Contact us"
-        />
-        <Contact />
-      </>
-    );
+  else if (root === "contact") page = <Contact />;
   else if (root === "login" || root === "register")
     page = <AuthForm mode={root} />;
   else if (root === "forgot-password") page = <AuthForm mode="forgot" />;

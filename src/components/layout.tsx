@@ -23,9 +23,9 @@ import NotificationsNone from "@mui/icons-material/NotificationsNone";
 import { services } from "@/lib/catalog";
 import { useAuth } from "./providers";
 import { Icon } from "./icon";
-export function Logo() {
+export function Logo({ href = "/" }: { href?: string }) {
   return (
-    <Link href="/" className="logo" aria-label="Solid Connect home">
+    <Link href={href} className="logo" aria-label="Solid Connect home">
       <span className="brand-symbol">
         <Image
           src="/images/solid-connect-logo-original.png"
@@ -173,13 +173,12 @@ export function Header() {
           : (menu === "business"
               ? [
                   ["Business dashboard", "/portal"],
-                  ["Post a listing", "/portal/listings/new"],
                   ["Advertise products & services", "/portal/listings/new"],
                 ]
               : [
                   ["Insights & resources", "/resources"],
                   ["Help & FAQs", "/faq"],
-                  ["Track a shipment", "/track"],
+                  ["Arrange transport", "/services/logistics"],
                 ]
             ).map(([label, url]) => (
               <MenuItem key={url} component={Link} href={url} onClick={close}>
@@ -206,7 +205,7 @@ export function Header() {
             ["Dashboard", "/portal"],
             ["Resources", "/resources"],
             ["Contact", "/contact"],
-            ["Track a shipment", "/track"],
+            ["Arrange transport", "/services/logistics"],
             ["Sign in", "/portal/login"],
           ].map(([label, url]) => (
             <Link key={url} href={url} onClick={() => setDrawer(false)}>
@@ -299,7 +298,7 @@ export function Footer() {
             links: [
               ["Marketplace", "/marketplace"],
               ["Resources", "/resources"],
-              ["Track a shipment", "/track"],
+              ["Arrange transport", "/services/logistics"],
               ["Help & FAQs", "/faq"],
             ],
           },

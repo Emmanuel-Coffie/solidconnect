@@ -24,13 +24,15 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       </a>
       <header className="portal-header">
         <div className="portal-brand">
-          <Logo />
-          <span className="portal-label">Advertiser portal</span>
+          <Logo href={user?.role === "ADMIN" ? "/portal/admin" : "/portal"} />
+          <span className="portal-label">
+            {user?.role === "ADMIN" ? "Admin portal" : "Advertiser portal"}
+          </span>
         </div>
         <nav aria-label="Portal navigation">
-          <Link href="/marketplace">View marketplace ↗</Link>
+          {!user && <Link href="/marketplace">View marketplace ↗</Link>}
           {user ? (
-            <Link href="/portal">My workspace</Link>
+            <Link href="/contact">Get help ↗</Link>
           ) : (
             <Link
               href={
@@ -41,9 +43,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             >
               {pathname === "/portal/register" ? "Sign in" : "Create account"}
             </Link>
-          )}
-          {user?.role === "ADMIN" && (
-            <Link href="/portal/admin">Admin inbox</Link>
           )}
         </nav>
       </header>

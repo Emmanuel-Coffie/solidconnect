@@ -8,23 +8,19 @@ import {
   Alert,
   TextField,
   MenuItem,
-  Skeleton,
+  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
 } from "@mui/material";
-import DashboardOutlined from "@mui/icons-material/DashboardOutlined";
-import PersonOutline from "@mui/icons-material/PersonOutline";
 import Add from "@mui/icons-material/Add";
-import ChatBubbleOutline from "@mui/icons-material/ChatBubbleOutline";
-import BookmarkBorder from "@mui/icons-material/BookmarkBorder";
-import ReceiptLongOutlined from "@mui/icons-material/ReceiptLongOutlined";
 import { api, useAuth } from "./providers";
-import { Icon } from "./icon";
 import { ListingCard } from "./cards";
 import { CategorySelect } from "./forms";
 import { listingSchema } from "@/lib/validation";
+import { UnsavedChanges } from "./unsaved-changes";
+import { PortalWorkspace, workspaceLinks } from "./portal-workspace";
 import { type Listing, money, services, photo } from "@/lib/catalog";
 import type { Entry, Message, User } from "@/lib/store";
 export type DashboardData = {
@@ -40,33 +36,13 @@ export type DashboardData = {
     createdAt: string;
   }[];
 };
-const links = [
-  ["Overview", "/portal", "dashboard"],
-  ["My profile", "/portal/profile", "person"],
-  ["My listings", "/portal/listings", "inventory"],
-  ["My orders", "/portal/orders", "inventory"],
-  ["My requests", "/portal/requests", "chat"],
-  ["Applications", "/portal/applications", "people"],
-  ["Saved items", "/portal/saved", "saved"],
-  ["Messages", "/portal/messages", "chat"],
-  ["Notifications", "/portal/notifications", "check"],
-  ["Settings", "/portal/settings", "person"],
-];
-function NavIcon({ name }: { name: string }) {
-  if (name === "dashboard") return <DashboardOutlined />;
-  if (name === "person") return <PersonOutline />;
-  if (name === "chat") return <ChatBubbleOutline />;
-  if (name === "saved") return <BookmarkBorder />;
-  if (name === "receipt") return <ReceiptLongOutlined />;
-  return <Icon name={name} />;
-}
+const links = workspaceLinks.map((x) => [x.label, x.href]);
 export function Dashboard({ section = "overview" }: { section?: string }) {
   const { user, loading, refresh } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
-  const [signingOut, setSigningOut] = useState(false);
   const load = useCallback(async () => {
     try {
       setData(await api<DashboardData>("dashboard"));
@@ -76,10 +52,10 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
     }
   }, []);
   useEffect(() => {
-    if (!loading && !user && !signingOut)
+    if (!loading && !user)
       router.replace(`/portal/login?next=${encodeURIComponent(pathname)}`);
     if (user) load();
-  }, [user, loading, router, pathname, load, signingOut]);
+  }, [user, loading, router, pathname, load]);
   if (!user)
     return (
       <div className="loading-page">
@@ -94,58 +70,16 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
         : (links.find((l) => l[1].endsWith(`/${section}`))?.[0] ??
           "Your dashboard");
   return (
-    <div className="dashboard">
-      <aside className="dashboard-sidebar">
-        <div className="profile-summary">
-          <span className="avatar">{user.name[0]}</span>
-          <div>
-            <b>{user.company || user.name}</b>
-            <small>{user.accountType} account</small>
-          </div>
-        </div>
-        <h4>Your workspace</h4>
-        {links.map(([label, url, icon]) => (
-          <Link
-            href={url}
-            className={pathname === url ? "active" : ""}
-            key={url}
-          >
-            <NavIcon name={icon} />
-            {label}
-          </Link>
-        ))}
-        {user.role === "ADMIN" && (
-          <Link href="/portal/admin">
-            <Icon name="check" />
-            Administration
-          </Link>
-        )}
-        <Button
-          disabled={signingOut}
-          onClick={async () => {
-            setSigningOut(true);
-            try {
-              await api("logout", {});
-              await refresh();
-              router.replace("/portal/login");
-            } catch (error) {
-              setError((error as Error).message);
-              setSigningOut(false);
-            }
-          }}
-        >
-          Sign out
-        </Button>
-      </aside>
+    <PortalWorkspace>
       <div className="dashboard-body">
         <div className="dashboard-title row-between">
           <div>
-            <div className="eyebrow">Your connections, in one place</div>
+            <div className="eyebrow">Your business, connected</div>
             <h1>{title}</h1>
             <p>
               {section === "overview"
                 ? "Manage your products and services. Our admin team handles customer enquiries."
-                : "Keep your opportunities moving forward."}
+                : "Everything you need for your next connection."}
             </p>
           </div>
           {section !== "new" && (
@@ -155,7 +89,7 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
               color="secondary"
               startIcon={<Add />}
             >
-              Post a listing
+              Create listing
             </LinkButton>
           )}
         </div>
@@ -168,7 +102,14 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
           </Alert>
         )}
         {!data ? (
-          <Skeleton variant="rounded" height={350} />
+          <div className="workspace-loading" role="status">
+            <CircularProgress size={24} />
+            <p>
+              {error
+                ? "Could not load your workspace. Try again."
+                : "Loading your workspace…"}
+            </p>
+          </div>
         ) : section === "overview" ? (
           <Overview data={data} />
         ) : section === "new" ? (
@@ -204,7 +145,7 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
           <Requests data={data} section={section} reload={load} />
         )}
       </div>
-    </div>
+    </PortalWorkspace>
   );
 }
 export function Empty({
@@ -229,96 +170,154 @@ export function Empty({
   );
 }
 function Overview({ data }: { data: DashboardData }) {
+  const published = data.listings.filter(
+    (l) => l.status === "published",
+  ).length;
+  const pending = data.listings.filter((l) => l.status === "pending").length;
   return (
     <>
-      <div className="stats-grid">
+      <div className="workspace-welcome">
+        <div>
+          <span className="eyebrow">Built for your next opportunity</span>
+          <h2>
+            Your expertise.
+            <br />A wider audience.
+          </h2>
+          <p>
+            {data.listings.length
+              ? "Keep your offers up to date. Our admin team coordinates every customer enquiry."
+              : "Introduce your product or service. We review your listing and help the right people find you."}
+          </p>
+          <LinkButton
+            href="/portal/listings/new"
+            variant="contained"
+            color="secondary"
+            startIcon={<Add />}
+          >
+            {data.listings.length
+              ? "Create another listing"
+              : "Create your first listing"}
+          </LinkButton>
+        </div>
+        <div className="connection-art" aria-hidden="true">
+          <span className="connection-node">YOU</span>
+          <span className="connection-line" />
+          <span className="connection-hub">
+            SOLID
+            <br />
+            <b>CONNECT</b>
+          </span>
+          <span className="connection-line" />
+          <span className="connection-node">
+            YOUR
+            <br />
+            AUDIENCE
+          </span>
+          <small>Good connections start here.</small>
+        </div>
+      </div>
+      <div className="stats-grid workspace-stats">
         {[
           [
-            "Active listings",
-            String(
-              data.listings.filter((l) => l.status === "published").length,
-            ),
-          ],
-          ["Saved opportunities", String(data.saved.length)],
-          [
-            "Ongoing requests",
-            String(
-              data.requests.filter(
-                (r) => r.status !== "Completed" && r.status !== "Rejected",
-              ).length,
-            ),
+            "Live listings",
+            published,
+            "/portal/listings",
+            "Visible in the marketplace",
           ],
           [
-            "Awaiting review",
-            String(data.listings.filter((l) => l.status === "pending").length),
+            "In review",
+            pending,
+            "/portal/listings",
+            "Awaiting an admin decision",
           ],
-        ].map(([label, value]) => (
-          <div className="stat-card" key={label}>
-            <span>{label}</span>
+          [
+            "Your requests",
+            data.requests.filter(
+              (r) => r.status !== "Completed" && r.status !== "Rejected",
+            ).length,
+            "/portal/requests",
+            "Coordinated by Solid Connect",
+          ],
+          [
+            "Saved items",
+            data.saved.length,
+            "/portal/saved",
+            "Ideas for your next move",
+          ],
+        ].map(([label, value, href, hint]) => (
+          <Link className="stat-card" href={String(href)} key={label}>
+            <span>
+              {label}
+              <span aria-hidden="true">↗</span>
+            </span>
             <strong>{value}</strong>
-          </div>
+            <small>{hint}</small>
+          </Link>
         ))}
       </div>
       <div className="dashboard-columns">
-        <div className="panel">
+        <section className="panel">
           <div className="row-between">
-            <h3>Recent activity</h3>
-            <Link href="/portal/requests" className="text-link">
-              View all
+            <div>
+              <span className="eyebrow">Your storefront</span>
+              <h3>Latest listings</h3>
+            </div>
+            <Link href="/portal/listings" className="text-link">
+              View all →
             </Link>
           </div>
-          {data.requests.length ? (
-            data.requests
-              .slice(-5)
+          {data.listings.length ? (
+            data.listings
+              .slice(-4)
               .reverse()
-              .map((r) => (
+              .map((l) => (
                 <Link
-                  href="/portal/messages"
+                  href={`/portal/listings/new?edit=${l.id}`}
                   className="activity-row"
-                  key={r.id}
+                  key={l.id}
                 >
-                  <span className="menu-icon">
-                    <Icon name="people" />
-                  </span>
+                  <img className="listing-thumb" src={photo(l.image)} alt="" />
                   <div>
-                    <h4>{r.subject}</h4>
+                    <h4>{l.title}</h4>
                     <p>
-                      {r.kind} ·{" "}
-                      {new Date(r.createdAt).toLocaleDateString("en-GB")}
+                      {l.category} · {l.location}
                     </p>
                   </div>
-                  <span className="status">{r.status}</span>
+                  <span className={`status ${l.status}`}>
+                    {l.status === "pending" ? "In review" : l.status}
+                  </span>
                 </Link>
               ))
           ) : (
             <Empty
-              title="Start with a connection."
-              text="Enquiries, applications and bookings appear here."
+              title="Put your business on the map."
+              text="A clear title, useful details and a great photo are all you need to start."
+              href="/portal/listings/new"
+              cta="Create a listing"
             />
           )}
-        </div>
-        <div className="panel">
-          <h3>Make your next move</h3>
-          <div className="quick-actions">
-            {[
-              ["Post a new listing", "/portal/listings/new", "inventory"],
-              ["Find your next hire", "/services/recruitment", "people"],
-              ["Track a shipment", "/track", "shipping"],
-              ["Request a quote", "/services/logistics", "globe"],
-              ["Explore opportunities", "/marketplace", "arrow"],
-            ].map(([label, url, icon]) => (
-              <Link href={url} key={label}>
-                <Icon name={icon} />
-                {label}
-                <span style={{ marginLeft: "auto" }}>↗</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </div>
-      <div className="notice">
-        Your workspace starts with your own activity. Marketplace listings
-        marked Demo are examples.
+        </section>
+        <section className="panel workspace-guide">
+          <span className="eyebrow">How it works</span>
+          <h3>From listing to connection</h3>
+          <ol>
+            <li>
+              <b>Share what you offer</b>
+              <p>Add your product or service and where you work.</p>
+            </li>
+            <li>
+              <b>We review your listing</b>
+              <p>Our team checks the details before it goes live.</p>
+            </li>
+            <li>
+              <b>We coordinate enquiries</b>
+              <p>Customers contact admin. We handle the next steps with you.</p>
+            </li>
+          </ol>
+          <Link className="text-link" href="/contact">
+            Need a hand? Contact our team →
+          </Link>
+        </section>
       </div>
     </>
   );
@@ -336,11 +335,13 @@ function ProfileForm({
     company: data.user.company ?? "",
     phone: data.user.phone ?? "",
   });
+  const [savedForm, setSavedForm] = useState(JSON.stringify(form));
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   return (
     <div className="panel wide-form">
+      <UnsavedChanges dirty={JSON.stringify(form) !== savedForm} />
       <h2>Your profile</h2>
       <form
         noValidate
@@ -352,6 +353,7 @@ function ProfileForm({
           try {
             await api("profile", form);
             await refresh();
+            setSavedForm(JSON.stringify(form));
             setStatus("Profile updated.");
           } catch (e) {
             setError((e as Error).message);
@@ -460,7 +462,7 @@ function MyListings({
               </LinkButton>
             )}
             {l.status !== "suspended" && (
-              <Button color="error" onClick={() => setSelected(l)}>
+              <Button color="warning" onClick={() => setSelected(l)}>
                 Withdraw listing
               </Button>
             )}
@@ -476,11 +478,11 @@ function MyListings({
           </p>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSelected(null)} disabled={busy}>
+          <Button autoFocus onClick={() => setSelected(null)} disabled={busy}>
             Keep listing
           </Button>
           <Button
-            color="error"
+            color="warning"
             disabled={busy}
             onClick={async () => {
               setBusy(true);
@@ -623,7 +625,7 @@ function Messages({
     return (
       <Empty
         title="A conversation can change everything."
-        text="Send an enquiry to start a conversation with a provider."
+        text="Send an enquiry from a listing or service. Your conversation stays with Solid Connect admin."
       />
     );
   return (
@@ -633,7 +635,14 @@ function Messages({
           <button
             className={selected === r.id ? "active" : ""}
             key={r.id}
-            onClick={() => setSelected(r.id)}
+            onClick={() => {
+              setSelected(r.id);
+              window.history.replaceState(
+                null,
+                "",
+                `/portal/messages?conversation=${encodeURIComponent(r.id)}`,
+              );
+            }}
           >
             <b>{r.subject}</b>
             <small style={{ display: "block" }}>{r.kind}</small>
@@ -770,6 +779,8 @@ function ListingWizard({ onCreated }: { onCreated: () => Promise<void> }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const [attempted, setAttempted] = useState(false);
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("edit");
     if (id)
@@ -784,33 +795,58 @@ function ListingWizard({ onCreated }: { onCreated: () => Promise<void> }) {
         .catch((e) => setError(e.message));
   }, []);
   const draftKey = `solid-listing-draft:${user?.id}`;
-  const update = (key: string, value: string) =>
+  const update = (key: string, value: string) => {
+    setDirty(true);
     setForm({ ...form, [key]: value });
+  };
   function next() {
     setError("");
-    if (step === 0 && (!form.title.trim() || !form.location.trim())) {
-      setError("Add a title and location to continue.");
+    setAttempted(true);
+    if (
+      step === 0 &&
+      (form.title.trim().length < 5 || form.location.trim().length < 2)
+    ) {
+      setError(
+        "Add a title of at least 5 characters and a location of at least 2 characters.",
+      );
+      document
+        .getElementById(
+          form.title.trim().length < 5 ? "listing-title" : "listing-location",
+        )
+        ?.focus();
       return;
     }
     if (step === 1) {
       const parsed = listingSchema.safeParse(form);
       if (!parsed.success) {
         setError(parsed.error.issues[0].message);
+        document.getElementById("listing-description")?.focus();
         return;
       }
     }
+    setAttempted(false);
     setStep(step + 1);
   }
   return (
     <div className="panel wide-form">
+      <UnsavedChanges dirty={dirty} />
       <div className="row-between">
         <h2>{editId ? "Edit your listing" : "Share your next opportunity."}</h2>
         <small>Step {step + 1} of 3</small>
       </div>
       <div className="form-steps">
-        {[0, 1, 2].map((i) => (
-          <span key={i} className={step >= i ? "active" : ""} />
-        ))}
+        {["Offer details", "Description & photo", "Review & send"].map(
+          (label, i) => (
+            <span
+              key={label}
+              className={step >= i ? "active" : ""}
+              aria-current={step === i ? "step" : undefined}
+            >
+              <b>{i + 1}</b>
+              {label}
+            </span>
+          ),
+        )}
       </div>
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -825,6 +861,7 @@ function ListingWizard({ onCreated }: { onCreated: () => Promise<void> }) {
       <form
         noValidate
         className="form-stack"
+        onChange={() => setDirty(true)}
         onSubmit={async (e) => {
           e.preventDefault();
           if (step < 2) {
@@ -834,7 +871,12 @@ function ListingWizard({ onCreated }: { onCreated: () => Promise<void> }) {
           setBusy(true);
           try {
             await api("listing", { ...form, id: editId || undefined });
-            localStorage.removeItem(draftKey);
+            setDirty(false);
+            try {
+              localStorage.removeItem(draftKey);
+            } catch {
+              /* Saved on server; browser storage may be unavailable. */
+            }
             await onCreated();
             router.push("/portal/listings");
           } catch (e) {
@@ -859,12 +901,25 @@ function ListingWizard({ onCreated }: { onCreated: () => Promise<void> }) {
               }}
             />
             <TextField
+              id="listing-title"
+              error={attempted && form.title.trim().length < 5}
               label="Listing title"
               value={form.title}
               onChange={(e) => update("title", e.target.value)}
-              helperText="Be specific. Tell people what you offer."
+              helperText={
+                attempted && form.title.trim().length < 5
+                  ? "Use at least 5 characters."
+                  : "Be specific. Tell people what you offer."
+              }
             />
             <TextField
+              id="listing-location"
+              error={attempted && form.location.trim().length < 2}
+              helperText={
+                attempted && form.location.trim().length < 2
+                  ? "Enter a city or service area."
+                  : undefined
+              }
               label="Location"
               value={form.location}
               onChange={(e) => update("location", e.target.value)}
@@ -889,6 +944,8 @@ function ListingWizard({ onCreated }: { onCreated: () => Promise<void> }) {
             <TextField
               multiline
               minRows={5}
+              id="listing-description"
+              error={attempted && form.description.trim().length < 30}
               label="Description"
               value={form.description}
               onChange={(e) => update("description", e.target.value)}
@@ -918,7 +975,7 @@ function ListingWizard({ onCreated }: { onCreated: () => Promise<void> }) {
               alt="Listing preview"
             />
             <Button component="label" variant="outlined" disabled={busy}>
-              Upload a listing image
+              {busy ? "Uploading image…" : "Upload a listing image"}
               <input
                 hidden
                 type="file"
@@ -926,6 +983,10 @@ function ListingWizard({ onCreated }: { onCreated: () => Promise<void> }) {
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
+                  if (file.size > 4 * 1024 * 1024) {
+                    setError("Choose an image under 4 MB.");
+                    return;
+                  }
                   const body = new FormData();
                   body.append("file", file);
                   setBusy(true);
@@ -946,7 +1007,7 @@ function ListingWizard({ onCreated }: { onCreated: () => Promise<void> }) {
               />
             </Button>
             <p className="small-caption">
-              JPG, PNG or WebP, up to 5 MB. Only upload images you are entitled
+              JPG, PNG or WebP, up to 4 MB. Only upload images you are entitled
               to use.
             </p>
           </>

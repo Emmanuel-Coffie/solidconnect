@@ -11,14 +11,12 @@ export async function POST(req: Request) {
 
     rateLimit(`upload:${user.id}`, 20);
 
-    const contentLength = Number(
-      req.headers.get("content-length") ?? 0,
-    );
+    const contentLength = Number(req.headers.get("content-length") ?? 0);
 
-    if (contentLength > 6 * 1024 * 1024) {
+    if (contentLength > 4.24 * 1024 * 1024) {
       return Response.json(
         {
-          error: "Choose an image under 5 MB.",
+          error: "Choose an image under 4 MB.",
         },
         { status: 413 },
       );
@@ -27,56 +25,32 @@ export async function POST(req: Request) {
     const form = await req.formData();
     const file = form.get("file");
 
-    if (
-      !(file instanceof File) ||
-      file.size > 5 * 1024 * 1024
-    ) {
+    if (!(file instanceof File) || file.size > 4 * 1024 * 1024) {
       return Response.json(
         {
-          error:
-            "Choose a JPG, PNG or WebP image under 5 MB.",
+          error: "Choose a JPG, PNG or WebP image under 4 MB.",
         },
         { status: 400 },
       );
     }
 
-    const bytes = Buffer.from(
-      await file.arrayBuffer(),
-    );
+    const bytes = Buffer.from(await file.arrayBuffer());
 
-    const ext = bytes
-      .subarray(0, 3)
-      .equals(
-        Buffer.from([255, 216, 255]),
-      )
+    const ext = bytes.subarray(0, 3).equals(Buffer.from([255, 216, 255]))
       ? "jpg"
       : bytes
             .subarray(0, 8)
-            .equals(
-              Buffer.from([
-                137, 80, 78, 71,
-                13, 10, 26, 10,
-              ]),
-            )
+            .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
         ? "png"
-        : bytes.toString(
-              "ascii",
-              0,
-              4,
-            ) === "RIFF" &&
-            bytes.toString(
-              "ascii",
-              8,
-              12,
-            ) === "WEBP"
+        : bytes.toString("ascii", 0, 4) === "RIFF" &&
+            bytes.toString("ascii", 8, 12) === "WEBP"
           ? "webp"
           : null;
 
     if (!ext) {
       return Response.json(
         {
-          error:
-            "This file is not a supported image. Use JPG, PNG or WebP.",
+          error: "This file is not a supported image. Use JPG, PNG or WebP.",
         },
         { status: 400 },
       );
@@ -92,9 +66,7 @@ export async function POST(req: Request) {
       process.env.CLOUDINARY_API_KEY &&
       process.env.CLOUDINARY_API_SECRET
     ) {
-      const timestamp = String(
-        Math.floor(Date.now() / 1000),
-      );
+      const timestamp = String(Math.floor(Date.now() / 1000));
 
       /*
        * Modern Cloudinary accounts normally use
@@ -123,29 +95,15 @@ export async function POST(req: Request) {
         `&timestamp=${timestamp}` +
         process.env.CLOUDINARY_API_SECRET;
 
-      const signature = createHash("sha1")
-        .update(stringToSign)
-        .digest("hex");
+      const signature = createHash("sha1").update(stringToSign).digest("hex");
 
       const upload = new FormData();
 
       upload.set("file", file);
-      upload.set(
-        "api_key",
-        process.env.CLOUDINARY_API_KEY,
-      );
-      upload.set(
-        "timestamp",
-        timestamp,
-      );
-      upload.set(
-        "asset_folder",
-        assetFolder,
-      );
-      upload.set(
-        "signature",
-        signature,
-      );
+      upload.set("api_key", process.env.CLOUDINARY_API_KEY);
+      upload.set("timestamp", timestamp);
+      upload.set("asset_folder", assetFolder);
+      upload.set("signature", signature);
 
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/${encodeURIComponent(
@@ -166,52 +124,39 @@ export async function POST(req: Request) {
          * Log the provider error on Railway,
          * but don't expose credentials.
          */
-        const providerError =
-          response.headers.get(
-            "x-cld-error",
-          );
+        const providerError = response.headers.get("x-cld-error");
 
         let responseMessage = "";
 
         try {
-          const result =
-            await response.json();
+          const result = await response.json();
 
-          responseMessage =
-            result?.error?.message ??
-            "";
+          responseMessage = result?.error?.message ?? "";
         } catch {
           responseMessage = "";
         }
 
         console.error(
           "Cloudinary upload failed:",
-          providerError ||
-            responseMessage ||
-            `HTTP ${response.status}`,
+          providerError || responseMessage || `HTTP ${response.status}`,
         );
 
         return Response.json(
           {
-            error:
-              "Image upload failed. Please try again.",
+            error: "Image upload failed. Please try again.",
           },
           { status: 502 },
         );
       }
 
-      const result =
-        await response.json();
+      const result = await response.json();
 
       if (!result.secure_url) {
-        console.error(
-          "Cloudinary upload succeeded without secure_url.",
-        );
+        console.error("Cloudinary upload succeeded without secure_url.");
 
         return Response.json(
           {
-            error:
-              "Image upload did not return a valid image URL.",
+            error: "Image upload did not return a valid image URL.",
           },
           { status: 502 },
         );
@@ -225,17 +170,11 @@ export async function POST(req: Request) {
     /*
      * LOCAL DEVELOPMENT STORAGE
      */
-    const dir = path.join(
-      process.cwd(),
-      "public",
-      "uploads",
-    );
+    const dir = path.join(process.cwd(), "public", "uploads");
 
     if (
-      process.env.NODE_ENV ===
-        "production" &&
-      process.env.ALLOW_LOCAL_DEMO !==
-        "true"
+      process.env.NODE_ENV === "production" &&
+      process.env.ALLOW_LOCAL_DEMO !== "true"
     ) {
       return Response.json(
         {
@@ -250,10 +189,7 @@ export async function POST(req: Request) {
       recursive: true,
     });
 
-    await writeFile(
-      path.join(dir, name),
-      bytes,
-    );
+    await writeFile(path.join(dir, name), bytes);
 
     return Response.json({
       url: `/uploads/${name}`,
@@ -261,15 +197,12 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error(
       "Image upload route failed:",
-      error instanceof Error
-        ? error.message
-        : "Unknown error",
+      error instanceof Error ? error.message : "Unknown error",
     );
 
     return Response.json(
       {
-        error:
-          "Sign in and try uploading again.",
+        error: "Sign in and try uploading again.",
       },
       { status: 401 },
     );

@@ -56,19 +56,30 @@ export function RequestForm({
   const artisan = /artisan|project/i.test(kind);
   const apply = /application/i.test(kind);
 
+  const logisticsService = details["Service required"] ?? "";
+  const vehicleHire = /rental|passenger|hire/i.test(logisticsService);
+  const relocation = /move|relocation/i.test(logisticsService);
   const extra = logistics
     ? [
         "Origin",
         "Destination",
-        "Vehicle type",
-        "Passengers or load details",
-        "Rental duration",
-        "Driver required",
-        "Access, stairs or packing needs",
-        "Weight (kg)",
-        "Volume (m³)",
-        "Transport mode",
         "Desired date",
+        ...(vehicleHire
+          ? [
+              "Vehicle type",
+              "Rental duration",
+              "Driver required",
+              "Passengers or load details",
+            ]
+          : relocation
+            ? [
+                "Vehicle type",
+                "Passengers or load details",
+                "Access, stairs or packing needs",
+              ]
+            : /freight/i.test(logisticsService)
+              ? ["Weight (kg)", "Volume (m³)", "Transport mode"]
+              : []),
       ]
     : trade
       ? [
@@ -138,6 +149,13 @@ export function RequestForm({
         }
       })}
     >
+      <div className="request-intro">
+        <b>Tell us what you need.</b>
+        <p>
+          No account or online payment required. Solid Connect admin will
+          coordinate the next steps.
+        </p>
+      </div>
       <div className="form-grid">
         <TextField
           label="Full name"
@@ -169,7 +187,7 @@ export function RequestForm({
             label="Logistics service"
             value={details["Service required"] ?? ""}
             onChange={(event) =>
-              setDetails({ ...details, "Service required": event.target.value })
+              setDetails({ "Service required": event.target.value })
             }
           >
             {[
@@ -332,8 +350,8 @@ export function Contact() {
               </p>
 
               <p className="small-caption">
-                Contact details and office location are awaiting company
-                confirmation. Use this form to record an enquiry in the demo.
+                Keep your enquiry reference. Our admin team uses the details you
+                supply to follow up with you.
               </p>
             </div>
           </div>
@@ -401,7 +419,7 @@ export function AuthForm({
 
   const title =
     mode === "register"
-      ? "Your next connection starts here."
+      ? "Give your business a home."
       : mode === "forgot"
         ? "Forgot your password?"
         : mode === "reset"
@@ -420,16 +438,17 @@ export function AuthForm({
           />
 
           <div>
-            <div className="eyebrow">Make your next move</div>
+            <div className="eyebrow">Your advertiser workspace</div>
 
             <h2>
-              Opportunity starts
+              Your work deserves
               <br />
-              with a connection.
+              to be discovered.
             </h2>
 
             <p>
-              Find your people. Grow your business. Build something that lasts.
+              Advertise your products and services, manage your listings, and
+              let our team coordinate the customer conversations.
             </p>
           </div>
         </div>
@@ -443,7 +462,7 @@ export function AuthForm({
             {mode === "register"
               ? "Create an advertiser account to promote your products and services. Customers can enquire without signing in."
               : mode === "login"
-                ? "Sign in to pick up where you left off."
+                ? "Sign in to manage your listings and connections."
                 : "We’ll help you get back to your connections."}
           </p>
 
@@ -471,6 +490,7 @@ export function AuthForm({
               try {
                 const result = await api<{
                   message?: string;
+                  user?: { role: string };
                 }>(mode, {
                   ...values,
                   accountType: type,
@@ -491,7 +511,13 @@ export function AuthForm({
 
                 await refresh();
 
-                router.push(safeReturn(params.get("next")));
+                router.push(
+                  params.get("next")
+                    ? safeReturn(params.get("next"))
+                    : result.user?.role === "ADMIN"
+                      ? "/portal/admin"
+                      : "/portal",
+                );
               } catch (e) {
                 setError((e as Error).message);
               }
